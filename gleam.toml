@@ -1,5 +1,5 @@
 name = "neon"
-version = "1.0.0"
+version = "2.0.0"
 description = "A Gleam networking library for TCP, UDP, and SSL/TLS sockets"
 licences = ["MIT"]
 repository = { type = "github", user = "stndrs", repo = "neon" }
