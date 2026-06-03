@@ -48,6 +48,30 @@ pub fn ec_pkix_test_data_test() {
   assert_handshake(data, <<"ec ok":utf8>>)
 }
 
+pub fn ec_secp384r1_test() {
+  let data =
+    testing.Secp384r1
+    |> testing.ec
+    |> testing.pkix_test_data(host)
+
+  assert bit_array.byte_size(data.server.cert) > 0
+  assert list.is_empty(data.server.cacerts) == False
+
+  assert_handshake(data, <<"ec384 ok":utf8>>)
+}
+
+pub fn ec_secp521r1_test() {
+  let data =
+    testing.Secp521r1
+    |> testing.ec
+    |> testing.pkix_test_data(host)
+
+  assert bit_array.byte_size(data.server.cert) > 0
+  assert list.is_empty(data.server.cacerts) == False
+
+  assert_handshake(data, <<"ec521 ok":utf8>>)
+}
+
 // ---------- helpers ---------- //
 
 fn assert_handshake(data: testing.PkixTestData, payload: BitArray) {
@@ -69,7 +93,7 @@ fn assert_handshake(data: testing.PkixTestData, payload: BitArray) {
       let assert Ok(timeout) = net.timeout(5000)
       let assert Ok(transport) = ssl.accept(listener, timeout)
       let assert Ok(server_ssl) = ssl.handshake(transport, hs_opts)
-      let assert Ok(Nil) = ssl.send(server_ssl, payload)
+      assert Ok(Nil) == ssl.send(server_ssl, payload)
       process.send(test_subject, Nil)
     })
 
