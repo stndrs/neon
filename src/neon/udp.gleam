@@ -16,6 +16,8 @@ pub type UdpError {
   SystemLimit
   /// A POSIX error.
   Posix(net.Posix)
+  /// The target pid is not alive.
+  InvalidPid
   /// A generic UDP error with a description.
   UdpError(String)
 }

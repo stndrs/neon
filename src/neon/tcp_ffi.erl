@@ -56,7 +56,7 @@ controlling_process(TcpSocket, Pid) ->
   case normalise(Res) of
     {error, badarg} ->
       case erlang:is_process_alive(Pid) of
-        false -> {error, {tcp_error, <<"invalid pid">>}};
+        false -> {error, invalid_pid};
         true  -> {error, closed}
       end;
     Other -> Other
