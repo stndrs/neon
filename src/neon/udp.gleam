@@ -1,3 +1,4 @@
+import gleam/erlang/process
 import gleam/option.{type Option, None, Some}
 import gleam/result
 import neon/net
@@ -102,6 +103,16 @@ pub fn receive(
   }
 }
 
+/// Change the controlling process of a socket.
+///
+/// The controlling process is the process that the socket sends messages to.
+pub fn controlling_process(
+  socket: Udp,
+  pid: process.Pid,
+) -> Result(Nil, UdpError) {
+  udp_controlling_process_(socket, pid)
+}
+
 /// Closes a UDP socket.
 ///
 /// This function is idempotent and always returns `Nil`.
@@ -140,6 +151,12 @@ fn udp_receive_(
   length: Int,
   timeout: net.Timeout,
 ) -> Result(#(net.IpAddress, net.Port, BitArray), UdpError)
+
+@external(erlang, "udp_ffi", "controlling_process")
+fn udp_controlling_process_(
+  socket: Udp,
+  pid: process.Pid,
+) -> Result(Nil, UdpError)
 
 @external(erlang, "udp_ffi", "close")
 fn udp_close_(socket: Udp) -> Nil
