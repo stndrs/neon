@@ -393,6 +393,74 @@ pub fn connect_tls_alert_unknown_ca_test() {
     |> ssl.connect
 }
 
+pub fn connect_ip_address_verify_peer_direct_test() {
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(port_num) = ssl.port(listener)
+
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.server.cacerts)
+
+  let test_subject = process.new_subject()
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(transport) = ssl.accept(listener, timeout)
+      let assert Ok(_server_ssl) = ssl.handshake(transport, hs_opts)
+      process.send(test_subject, Nil)
+    })
+
+  let ip_address = net.ip_address(loopback)
+
+  // verify_peer with IP address (SNI disabled, no hostname check)
+  let assert Ok(_ssl_socket) =
+    ssl.new(ip_address, port_num)
+    |> ssl.verify_peer
+    |> ssl.connect_cacerts(data.server.cacerts)
+    |> ssl.connect
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
+pub fn connect_wrong_cacerts_test() {
+  let server_data = testing.pkix_test_data(testing.rsa(2048), host)
+  let wrong_data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(port_num) = ssl.port(listener)
+
+  let hs_opts =
+    ssl.handshake_options(server_data.server.cert, server_data.server.key)
+    |> ssl.handshake_cacerts(server_data.server.cacerts)
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(transport) = ssl.accept(listener, timeout)
+      suppress_logger_()
+      let _result = ssl.handshake(transport, hs_opts)
+      default_logger_()
+    })
+
+  let ip_address = net.ip_address(loopback)
+
+  // Client uses wrong CA certs — should fail
+  let assert Error(ssl.TlsAlert(ssl.UnknownCa, _)) =
+    ssl.new(ip_address, port_num)
+    |> ssl.verify_peer
+    |> ssl.connect_cacerts(wrong_data.client.cacerts)
+    |> ssl.connect
+}
+
 // ---------- send ---------- //
 
 pub fn send_test() {
@@ -727,6 +795,43 @@ pub fn handshake_timeout_test() {
   assert Error(ssl.Timeout) == ssl.handshake(transport, hs_opts)
 }
 
+pub fn handshake_with_finite_timeout_test() {
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(listener_port) = ssl.port(listener)
+
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.server.cacerts)
+    |> ssl.handshake_timeout({
+      let assert Ok(t) = net.timeout(5000)
+      t
+    })
+
+  let test_subject = process.new_subject()
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(transport) = ssl.accept(listener, timeout)
+      let assert Ok(_server_ssl) = ssl.handshake(transport, hs_opts)
+      process.send(test_subject, Nil)
+    })
+
+  let host = net.hostname(host)
+
+  let assert Ok(_client_ssl) =
+    ssl.new(host, listener_port)
+    |> ssl.verify_none
+    |> ssl.connect
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
 // ---------- server: handshake send/receive ---------- //
 
 pub fn handshake_send_receive_test() {
@@ -773,6 +878,49 @@ pub fn handshake_send_receive_test() {
 
   // Client sends data to server
   assert Ok(Nil) == ssl.send(client_ssl, <<"from client":utf8>>)
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
+pub fn handshake_ec_key_test() {
+  let data = testing.pkix_test_data(testing.ec(testing.Secp256r1), host)
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(listener_port) = ssl.port(listener)
+
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.server.cacerts)
+
+  let test_subject = process.new_subject()
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(transport) = ssl.accept(listener, timeout)
+      let assert Ok(server_ssl) = ssl.handshake(transport, hs_opts)
+
+      assert Ok(Nil) == ssl.send(server_ssl, <<"ec hello":utf8>>)
+
+      let assert Ok(<<"ec reply":utf8>>) = ssl.receive(server_ssl, 8, timeout)
+
+      process.send(test_subject, Nil)
+    })
+
+  let host = net.hostname(host)
+
+  let assert Ok(client_ssl) =
+    ssl.new(host, listener_port)
+    |> ssl.verify_none
+    |> ssl.connect
+
+  let assert Ok(timeout) = net.timeout(5000)
+  let assert Ok(<<"ec hello":utf8>>) = ssl.receive(client_ssl, 8, timeout)
+
+  assert Ok(Nil) == ssl.send(client_ssl, <<"ec reply":utf8>>)
 
   let assert Ok(_) = process.receive(test_subject, 5000)
 }
@@ -863,6 +1011,14 @@ pub fn connect_ssl_not_started_test() {
   tcp.close(tcp_listener)
 
   assert Ok(Nil) == ssl.start()
+}
+
+pub fn listen_error_test() {
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(1)
+
+  // Port 1 is privileged so listening should fail
+  let assert Error(ssl.Posix(net.Eacces)) = ssl.listen(port, loopback)
 }
 
 fn connected_pair() -> #(Ssl, Ssl) {
