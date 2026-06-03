@@ -574,7 +574,7 @@ pub fn controlling_process_invalid_pid_test() {
   let pid = process.spawn(fn() { Nil })
   process.sleep(10)
 
-  assert ssl.controlling_process(client, pid) == Ok(Nil)
+  assert ssl.controlling_process(client, pid) == Error(ssl.InvalidPid)
 }
 
 // ---------- port ---------- //

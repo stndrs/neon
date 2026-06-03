@@ -493,10 +493,7 @@ fn connected_pair() -> #(Tcp, Tcp) {
   #(socket, listener)
 }
 
-fn tcp_receive_all(
-  socket: Tcp,
-  acc: BitArray,
-) -> Result(BitArray, tcp.TcpError) {
+fn tcp_receive_all(socket: Tcp, acc: BitArray) -> Result(BitArray, tcp.TcpError) {
   let assert Ok(timeout) = net.timeout(5000)
 
   case tcp.receive(socket, 0, timeout) {
