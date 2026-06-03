@@ -369,6 +369,20 @@ pub fn controlling_process_close_test() {
   assert tcp.controlling_process(client, process.self()) == Error(tcp.Closed)
 }
 
+pub fn controlling_process_invalid_pid_test() {
+  let #(client, listener) = connected_pair()
+
+  let assert Ok(timeout) = net.timeout(1000)
+  let assert Ok(_) = tcp.accept(listener, timeout)
+
+  // Spawn a process that immediately exits
+  let pid = process.spawn(fn() { Nil })
+  process.sleep(10)
+
+  assert tcp.controlling_process(client, pid)
+    == Error(tcp.TcpError("invalid pid"))
+}
+
 // Creates a TCP listener on an OS-assigned port, connects a client socket
 // to it, and returns the client socket along with the listener port
 fn connected_pair() -> #(Tcp, Tcp) {

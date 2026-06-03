@@ -112,7 +112,7 @@ pub fn passive(socket: Tcp) -> Result(Tcp, TcpError) {
   tcp_passive_(socket)
 }
 
-/// Change the controlling process (owner) of a socket.
+/// Change the controlling process of a socket.
 ///
 /// The controlling process is the process that the socket sends messages to.
 pub fn controlling_process(
