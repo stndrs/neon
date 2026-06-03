@@ -101,6 +101,52 @@ pub fn upgrade_ip_address_test() {
   let assert Ok(_) = process.receive(test_subject, 5000)
 }
 
+pub fn upgrade_ip_address_verify_peer_test() {
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  // Set up a TCP listener, connect a client, then upgrade both sides to SSL
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+  let assert Ok(tcp_listener) = tcp.listen(port, loopback)
+  let assert Ok(port_num) = tcp.port(tcp_listener)
+
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.server.cacerts)
+
+  let test_subject = process.new_subject()
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(accepted) = tcp.accept(tcp_listener, timeout)
+
+      // Server-side upgrade: use ssl.handshake_tcp on a TCP socket
+      let assert Ok(_server_ssl) = ssl.handshake_from_tcp(accepted, hs_opts)
+      process.send(test_subject, Nil)
+    })
+
+  let assert Ok(address) =
+    net.parse_ip_address(loopback_str)
+    |> result.map(net.ip_address)
+
+  let assert Ok(client_tcp) =
+    address
+    |> tcp.new(port_num)
+    |> tcp.connect
+
+  let host = net.hostname(host)
+
+  // Client-side upgrade
+  let assert Ok(_ssl_socket) =
+    ssl.from_tcp(client_tcp, host)
+    |> ssl.verify_peer
+    |> ssl.connect_cacerts(data.server.cacerts)
+    |> ssl.connect
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
 pub fn upgrade_error_test() {
   let assert Ok(port) = net.port(0)
 
@@ -239,6 +285,44 @@ pub fn connect_verify_peer_test() {
 
   let assert Ok(_ssl_socket) =
     ssl.from_tcp(client_tcp, host)
+    |> ssl.verify_peer
+    |> ssl.connect_cacerts(data.server.cacerts)
+    |> ssl.connect
+}
+
+pub fn connect_ip_address_verify_peer_test() {
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(tcp_listener) = tcp.listen(port, loopback)
+  let assert Ok(port_num) = tcp.port(tcp_listener)
+
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.server.cacerts)
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(accepted) = tcp.accept(tcp_listener, timeout)
+      let assert Ok(_server_ssl) = ssl.handshake_from_tcp(accepted, hs_opts)
+    })
+
+  let assert Ok(address) =
+    net.parse_ip_address(loopback_str)
+    |> result.map(net.ip_address)
+
+  let assert Ok(client_tcp) =
+    address
+    |> tcp.new(port_num)
+    |> tcp.connect
+
+  let address = net.ip_address(loopback)
+
+  let assert Ok(_ssl_socket) =
+    ssl.from_tcp(client_tcp, address)
     |> ssl.verify_peer
     |> ssl.connect_cacerts(data.server.cacerts)
     |> ssl.connect
