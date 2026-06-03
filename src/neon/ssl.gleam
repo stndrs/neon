@@ -1,6 +1,5 @@
 import gleam/dynamic
 import gleam/erlang/atom
-import gleam/erlang/charlist.{type Charlist}
 import gleam/erlang/process.{type Selector}
 import gleam/option.{type Option, None, Some}
 import neon/net
@@ -100,8 +99,8 @@ type Verify {
 }
 
 type Connect {
-  Open(host: String, port: net.Port)
-  Upgrade(socket: Tcp, host: String)
+  Open(address: net.Address, port: net.Port)
+  Upgrade(socket: Tcp, address: net.Address)
 }
 
 /// Options for establishing an SSL/TLS connection.
@@ -115,11 +114,11 @@ pub opaque type ConnectOptions {
 }
 
 /// Creates connection options for a fresh SSL/TLS connection to the given
-/// host and port.
+/// address and port.
 ///
 /// Defaults to `verify_peer` and an infinite timeout.
-pub fn new(host: String, port: net.Port) -> ConnectOptions {
-  let connect = Open(host:, port:)
+pub fn new(address: net.Address, port: net.Port) -> ConnectOptions {
+  let connect = Open(address:, port:)
 
   ConnectOptions(
     connect:,
@@ -131,10 +130,12 @@ pub fn new(host: String, port: net.Port) -> ConnectOptions {
 
 /// Creates connection options to upgrade an existing TCP socket to SSL/TLS.
 ///
-/// The `host` is used for Server Name Indication (SNI). Defaults to
-/// `verify_peer` and an infinite timeout.
-pub fn from_tcp(socket: Tcp, host: String) -> ConnectOptions {
-  let connect = Upgrade(socket:, host:)
+/// The provided address can be a hostname or an IP Address. If the address
+/// is a hostname, that hostname is used for Server Name Indication. If the
+/// address is an IP Address, SNI is disabled. Defaults to `verify_peer`
+/// and an infinite timeout.
+pub fn from_tcp(socket: Tcp, address: net.Address) -> ConnectOptions {
+  let connect = Upgrade(socket:, address:)
 
   ConnectOptions(
     connect:,
@@ -183,14 +184,11 @@ pub fn timeout(opts: ConnectOptions, timeout: net.Timeout) -> ConnectOptions {
 /// `start` must be called before this function.
 pub fn connect(opts: ConnectOptions) -> Result(Ssl, SslError) {
   case opts.connect {
-    Open(host:, port:) ->
-      host
-      |> charlist.from_string
+    Open(address:, port:) ->
+      address
       |> ssl_connect_(port, opts.verify, opts.cacerts, opts.timeout)
-    Upgrade(socket:, host:) -> {
-      let host = charlist.from_string(host)
-
-      ssl_upgrade_(socket, host, opts.verify, opts.cacerts, opts.timeout)
+    Upgrade(socket:, address:) -> {
+      ssl_upgrade_(socket, address, opts.verify, opts.cacerts, opts.timeout)
     }
   }
 }
@@ -368,7 +366,7 @@ pub fn handshake_from_tcp(
 @external(erlang, "ssl_ffi", "upgrade")
 fn ssl_upgrade_(
   socket: Tcp,
-  host: Charlist,
+  address: net.Address,
   verify: Verify,
   cacerts: Option(List(BitArray)),
   timeout: net.Timeout,
@@ -385,7 +383,7 @@ fn handle_ssl_message_(message: dynamic.Dynamic) -> SslMessage
 
 @external(erlang, "ssl_ffi", "connect")
 fn ssl_connect_(
-  host: Charlist,
+  address: net.Address,
   port: net.Port,
   verify: Verify,
   cacerts: Option(List(BitArray)),

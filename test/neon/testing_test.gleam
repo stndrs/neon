@@ -73,6 +73,8 @@ fn assert_handshake(data: testing.PkixTestData, payload: BitArray) {
       process.send(test_subject, Nil)
     })
 
+  let host = net.hostname(host)
+
   let assert Ok(client_ssl) =
     ssl.new(host, listener_port)
     |> ssl.verify_none
