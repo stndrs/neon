@@ -398,8 +398,7 @@ pub fn controlling_process_invalid_pid_test() {
   let pid = process.spawn(fn() { Nil })
   process.sleep(10)
 
-  assert tcp.controlling_process(client, pid)
-    == Error(tcp.TcpError("invalid pid"))
+  assert tcp.controlling_process(client, pid) == Error(tcp.InvalidPid)
 }
 
 // ---------- connect timeout ---------- //

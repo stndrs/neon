@@ -51,7 +51,7 @@ controlling_process(UdpSocket, Pid) ->
       case normalise(Res) of
         {error, badarg} ->
           case erlang:is_process_alive(Pid) of
-            false -> {error, {udp_error, <<"invalid pid">>}};
+            false -> {error, invalid_pid};
             true  -> {error, closed}
           end;
         Other -> Other

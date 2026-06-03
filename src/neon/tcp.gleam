@@ -18,6 +18,8 @@ pub type TcpError {
   SystemLimit
   /// The calling process is not the current owner of the socket.
   NotOwner
+  /// The target pid is not alive.
+  InvalidPid
   /// A POSIX error.
   Posix(net.Posix)
   /// A generic TCP error with a description.

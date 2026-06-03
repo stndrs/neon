@@ -316,8 +316,7 @@ pub fn controlling_process_invalid_pid_test() {
   let pid = process.spawn(fn() { Nil })
   process.sleep(10)
 
-  assert udp.controlling_process(sock, pid)
-    == Error(udp.UdpError("invalid pid"))
+  assert udp.controlling_process(sock, pid) == Error(udp.InvalidPid)
 }
 
 // ---------- close ---------- //

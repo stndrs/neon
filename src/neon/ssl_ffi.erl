@@ -108,8 +108,12 @@ passive(SslSocket) ->
   end.
 
 controlling_process(SslSocket, Pid) ->
-  Res = ssl:controlling_process(SslSocket, Pid),
-  normalise(Res).
+  case erlang:is_process_alive(Pid) of
+    false -> {error, invalid_pid};
+    true ->
+      Res = ssl:controlling_process(SslSocket, Pid),
+      normalise(Res)
+  end.
 
 shutdown(SslSocket) ->
   Shut = ssl:shutdown(SslSocket, read_write),
