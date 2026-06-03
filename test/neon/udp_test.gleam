@@ -288,6 +288,38 @@ pub fn ipv6_send_receive_test() {
   udp.close(receiver)
 }
 
+// ---------- controlling_process ---------- //
+
+pub fn controlling_process_test() {
+  let assert Ok(port) = net.port(0)
+  let assert Ok(sock) = udp.new(port) |> udp.open
+
+  let pid = process.spawn(fn() { process.sleep(1000) })
+
+  assert udp.controlling_process(sock, pid) == Ok(Nil)
+}
+
+pub fn controlling_process_close_test() {
+  let assert Ok(port) = net.port(0)
+  let assert Ok(sock) = udp.new(port) |> udp.open
+
+  udp.close(sock)
+
+  assert udp.controlling_process(sock, process.self()) == Error(udp.Closed)
+}
+
+pub fn controlling_process_invalid_pid_test() {
+  let assert Ok(port) = net.port(0)
+  let assert Ok(sock) = udp.new(port) |> udp.open
+
+  // Spawn a process that immediately exits
+  let pid = process.spawn(fn() { Nil })
+  process.sleep(10)
+
+  assert udp.controlling_process(sock, pid)
+    == Error(udp.UdpError("invalid pid"))
+}
+
 // ---------- close ---------- //
 
 pub fn close_test() {

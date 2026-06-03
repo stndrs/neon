@@ -5,7 +5,8 @@
   connect/3,
   send/2,
   recv/3,
-  close/1
+  close/1,
+  controlling_process/2
 ]).
 
 open({port, Port}, MaybeIpAddress, IpVersion) ->
@@ -44,12 +45,28 @@ close(UdpSocket) ->
   gen_udp:close(UdpSocket),
   nil.
 
+controlling_process(UdpSocket, Pid) ->
+  try gen_udp:controlling_process(UdpSocket, Pid) of
+    Res ->
+      case normalise(Res) of
+        {error, badarg} ->
+          case erlang:is_process_alive(Pid) of
+            false -> {error, {udp_error, <<"invalid pid">>}};
+            true  -> {error, closed}
+          end;
+        Other -> Other
+      end
+  catch
+    error:{badmatch, {error, einval}} -> {error, closed}
+  end.
+
 normalise(ok) -> {ok, nil};
 normalise({ok, {Address, Port, _, Packet}}) ->
   {ok, {normalise_ip_address(Address), {port, Port}, Packet}};
 normalise({ok, {Address, Port, Packet}}) ->
   {ok, {normalise_ip_address(Address), {port, Port}, Packet}};
 normalise({ok, UdpSocket}) -> {ok, UdpSocket};
+normalise({error, badarg} = E) -> E;
 normalise({error, closed} = E) -> E;
 normalise({error, timeout} = E) -> E;
 normalise({error, system_limit} = E) -> E;
