@@ -513,6 +513,13 @@ pub fn accept_timeout_test() {
   let assert Error(ssl.Timeout) = ssl.accept(listener, timeout)
 }
 
+pub fn accept_non_listener_test() {
+  let #(client, _server) = connected_pair()
+
+  let assert Ok(timeout) = net.timeout(1000)
+  assert ssl.accept(client, timeout) == Error(ssl.SslError("invalid socket"))
+}
+
 pub fn handshake_timeout_test() {
   let data = testing.pkix_test_data(testing.rsa(2048), host)
 
