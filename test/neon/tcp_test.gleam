@@ -383,6 +383,78 @@ pub fn controlling_process_invalid_pid_test() {
     == Error(tcp.TcpError("invalid pid"))
 }
 
+// ---------- connect timeout ---------- //
+
+pub fn connect_timeout_test() {
+  // Use a non-routable address so the TCP handshake hangs
+  let assert Ok(address) =
+    net.parse_ip_address("192.0.2.1")
+    |> result.map(net.ip_address)
+
+  let assert Ok(port) = net.port(9999)
+  let assert Ok(short_timeout) = net.timeout(50)
+
+  let assert Error(tcp.Timeout) =
+    address
+    |> tcp.new(port)
+    |> tcp.timeout(short_timeout)
+    |> tcp.connect
+}
+
+pub fn connect_infinity_timeout_test() {
+  let assert Ok(port) = net.port(0)
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(listener) = tcp.listen(port, loopback)
+  let assert Ok(port_num) = tcp.port(listener)
+
+  let assert Ok(address) =
+    net.parse_ip_address(host)
+    |> result.map(net.ip_address)
+
+  // Spawn an acceptor so the connection succeeds
+  let test_subject = process.new_subject()
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(_) = tcp.accept(listener, timeout)
+      process.send(test_subject, Nil)
+    })
+
+  // Default timeout is infinity — should succeed
+  let assert Ok(_socket) =
+    address
+    |> tcp.new(port_num)
+    |> tcp.connect
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
+// ---------- listen port ---------- //
+
+pub fn listen_dynamic_port_test() {
+  let assert Ok(port) = net.port(0)
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(listener) = tcp.listen(port, loopback)
+
+  let assert Ok(assigned_port) = tcp.port(listener)
+  assert net.port_to_int(assigned_port) > 0
+
+  tcp.close(listener)
+}
+
+pub fn listen_ipv6_test() {
+  let assert Ok(port) = net.port(0)
+  let assert Ok(loopback) = net.ipv6_address(0, 0, 0, 0, 0, 0, 0, 1)
+  let assert Ok(listener) = tcp.listen(port, loopback)
+
+  let assert Ok(assigned_port) = tcp.port(listener)
+  assert net.port_to_int(assigned_port) > 0
+
+  tcp.close(listener)
+}
+
+// ---------- helpers ---------- //
+
 // Creates a TCP listener on an OS-assigned port, connects a client socket
 // to it, and returns the client socket along with the listener port
 fn connected_pair() -> #(Tcp, Tcp) {
