@@ -1,3 +1,6 @@
+import gleam/bit_array
+import gleam/bool
+import gleam/crypto
 import gleam/erlang/process
 import gleam/result
 import neon/net
@@ -252,6 +255,39 @@ pub fn connect_to_ip_address_test() {
   let assert Ok(_) = process.receive(test_subject, 5000)
 }
 
+pub fn connect_ipv6_test() {
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  let assert Ok(loopback) = net.ipv6_address(0, 0, 0, 0, 0, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(port_num) = ssl.port(listener)
+
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.server.cacerts)
+
+  let test_subject = process.new_subject()
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(transport) = ssl.accept(listener, timeout)
+      let assert Ok(_server_ssl) = ssl.handshake(transport, hs_opts)
+      process.send(test_subject, Nil)
+    })
+
+  let ip_address = net.ip_address(loopback)
+
+  let assert Ok(_ssl_socket) =
+    ssl.new(ip_address, port_num)
+    |> ssl.verify_none
+    |> ssl.connect
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
 pub fn connect_verify_peer_test() {
   let data = testing.pkix_test_data(testing.rsa(2048), host)
 
@@ -468,6 +504,19 @@ pub fn send_test() {
 
   assert Ok(Nil) == ssl.send(ssl_socket, <<"hello ssl":utf8>>)
   assert Ok(Nil) == ssl.shutdown(ssl_socket)
+}
+
+pub fn send_large_payload_test() {
+  let #(client, server) = connected_pair()
+
+  // 100KB payload — larger than a single TLS record (16KB max)
+  let payload = crypto.strong_random_bytes(100_000)
+
+  assert Ok(Nil) == ssl.send(client, payload)
+
+  // Receive in a loop since data may arrive in chunks
+  let assert Ok(received) = receive_all(server, 100_000)
+  assert received == payload
 }
 
 pub fn send_closed_test() {
@@ -1063,3 +1112,17 @@ fn suppress_logger_() -> Nil
 
 @external(erlang, "neon_test_ffi", "default_logger")
 fn default_logger_() -> Nil
+
+fn receive_all(socket: Ssl, remaining: Int) -> Result(BitArray, ssl.SslError) {
+  use <- bool.guard(when: remaining <= 0, return: Ok(<<>>))
+
+  let assert Ok(timeout) = net.timeout(5000)
+
+  ssl.receive(socket, 0, timeout)
+  |> result.try(fn(chunk) {
+    let chunk_size = bit_array.byte_size(chunk)
+
+    receive_all(socket, remaining - chunk_size)
+    |> result.map(bit_array.append(chunk, _))
+  })
+}

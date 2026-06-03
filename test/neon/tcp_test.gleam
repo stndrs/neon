@@ -1,3 +1,5 @@
+import gleam/bit_array
+import gleam/crypto
 import gleam/erlang/process
 import gleam/result
 import neon/net
@@ -106,6 +108,23 @@ pub fn send_test() {
 
   assert Ok(Nil) == tcp.send(socket, <<"hello":utf8>>)
   assert Ok(Nil) == tcp.shutdown(socket)
+}
+
+pub fn send_large_payload_test() {
+  let #(client, listener) = connected_pair()
+
+  let assert Ok(timeout) = net.timeout(5000)
+  let assert Ok(server) = tcp.accept(listener, timeout)
+
+  // 100KB payload — larger than typical TCP segment size
+  let payload = crypto.strong_random_bytes(100_000)
+
+  assert Ok(Nil) == tcp.send(client, payload)
+  assert Ok(Nil) == tcp.shutdown(client)
+
+  // Receive all data in a loop
+  let assert Ok(received) = tcp_receive_all(server, <<>>)
+  assert received == payload
 }
 
 pub fn send_closed_test() {
@@ -420,10 +439,11 @@ pub fn connect_infinity_timeout_test() {
       process.send(test_subject, Nil)
     })
 
-  // Default timeout is infinity — should succeed
+  // Explicitly pass infinity timeout
   let assert Ok(_socket) =
     address
     |> tcp.new(port_num)
+    |> tcp.timeout(net.infinity)
     |> tcp.connect
 
   let assert Ok(_) = process.receive(test_subject, 5000)
@@ -472,4 +492,14 @@ fn connected_pair() -> #(Tcp, Tcp) {
     |> tcp.connect
 
   #(socket, listener)
+}
+
+fn tcp_receive_all(socket: Tcp, acc: BitArray) -> Result(BitArray, tcp.TcpError) {
+  let assert Ok(timeout) = net.timeout(5000)
+
+  case tcp.receive(socket, 0, timeout) {
+    Ok(chunk) -> tcp_receive_all(socket, bit_array.append(acc, chunk))
+    Error(tcp.Closed) -> Ok(acc)
+    Error(e) -> Error(e)
+  }
 }
