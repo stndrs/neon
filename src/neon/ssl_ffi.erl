@@ -88,10 +88,7 @@ passive(SslSocket) ->
 
 controlling_process(SslSocket, Pid) ->
   Res = ssl:controlling_process(SslSocket, Pid),
-  case normalise(Res) of
-    {error, badarg} -> {error, closed};
-    Other -> Other
-  end.
+  normalise(Res).
 
 shutdown(SslSocket) ->
   Shut = ssl:shutdown(SslSocket, read_write),
@@ -130,8 +127,12 @@ transport_accept(ListenSocket, {timeout, Int}) ->
   transport_accept(ListenSocket, Int);
 
 transport_accept(ListenSocket, Timeout) ->
-  Resp = ssl:transport_accept(ListenSocket, Timeout),
-  normalise(Resp).
+  try ssl:transport_accept(ListenSocket, Timeout) of
+    Resp -> normalise(Resp)
+  catch
+    error:function_clause -> {error, {ssl_error, <<"invalid socket">>}};
+    error:badarg -> {error, {ssl_error, <<"invalid socket">>}}
+  end.
 
 handshake(Socket, Cert, Key, MaybeCaCerts, {timeout, Int}) ->
   handshake(Socket, Cert, Key, MaybeCaCerts, Int);

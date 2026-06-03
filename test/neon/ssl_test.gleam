@@ -460,6 +460,16 @@ pub fn controlling_process_close_test() {
   assert ssl.controlling_process(client, process.self()) == Error(ssl.Closed)
 }
 
+pub fn controlling_process_invalid_pid_test() {
+  let #(client, _server) = connected_pair()
+
+  // Spawn a process that immediately exits
+  let pid = process.spawn(fn() { Nil })
+  process.sleep(10)
+
+  assert ssl.controlling_process(client, pid) == Ok(Nil)
+}
+
 // ---------- port ---------- //
 
 pub fn port_test() {
@@ -501,6 +511,13 @@ pub fn accept_timeout_test() {
 
   let assert Ok(timeout) = net.timeout(100)
   let assert Error(ssl.Timeout) = ssl.accept(listener, timeout)
+}
+
+pub fn accept_non_listener_test() {
+  let #(client, _server) = connected_pair()
+
+  let assert Ok(timeout) = net.timeout(1000)
+  assert ssl.accept(client, timeout) == Error(ssl.SslError("invalid socket"))
 }
 
 pub fn handshake_timeout_test() {

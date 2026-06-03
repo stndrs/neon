@@ -68,8 +68,6 @@ pub type SslError {
   Closed
   /// The operation timed out.
   Timeout
-  /// The specified PID is not socket's owner.
-  NotOwner
   /// A POSIX error.
   Posix(net.Posix)
   /// A TLS alert.
@@ -232,9 +230,10 @@ pub fn passive(socket: Ssl) -> Result(Ssl, SslError) {
   ssl_passive_(socket)
 }
 
-/// Change the controlling process (owner) of a socket.
+/// Change the controlling process of a socket.
 ///
 /// The controlling process is the process that the socket sends messages to.
+/// Note that if the provided `Pid` is invalid, this function will no-op and return `Ok(Nil)`.
 pub fn controlling_process(
   socket: Ssl,
   pid: process.Pid,
