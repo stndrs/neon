@@ -31,48 +31,69 @@ port(SslSocket) ->
   Resp = ssl:sockname(SslSocket),
   normalise(Resp).
 
-upgrade(TCPSocket, Host, Verify, MaybeCaCerts, {timeout, Int}) ->
-  upgrade(TCPSocket, Host, Verify, MaybeCaCerts, Int);
+upgrade(TCPSocket, Address, Verify, MaybeCaCerts, {timeout, Int}) ->
+  upgrade(TCPSocket, Address, Verify, MaybeCaCerts, Int);
 
-upgrade(TCPSocket, Host, Verify, MaybeCaCerts, Timeout) ->
-  TLSOpts = connect_opts(Host, Verify, MaybeCaCerts),
-  Resp = ssl:connect(TCPSocket, TLSOpts, Timeout),
+upgrade(TCPSocket, Address, Verify, MaybeCaCerts, Timeout) ->
+  {_Addr, SNI} = address_with_sni(Address),
+
+  TLSOpts = connect_opts(Verify, MaybeCaCerts, SNI),
+  TLSOpts1 = [SNI | TLSOpts],
+
+  Resp = ssl:connect(TCPSocket, TLSOpts1, Timeout),
   normalise(Resp).
 
-connect(Host, Port, Verify, MaybeCaCerts, {timeout, Int}) ->
-  connect(Host, Port, Verify, MaybeCaCerts, Int);
+connect(Address, Port, Verify, MaybeCaCerts, {timeout, Int}) ->
+  connect(Address, Port, Verify, MaybeCaCerts, Int);
 
-connect(Host, {port, Port}, Verify, MaybeCaCerts, Timeout) ->
-  TLSOpts = connect_opts(Host, Verify, MaybeCaCerts),
-  Resp = ssl:connect(Host, Port, TLSOpts, Timeout),
+connect(Address, {port, Port}, Verify, MaybeCaCerts, Timeout) ->
+  {Addr, SNI} = address_with_sni(Address),
+
+  TLSOpts = connect_opts(Verify, MaybeCaCerts, SNI),
+  TLSOpts1 = [SNI | TLSOpts],
+
+  Resp = ssl:connect(Addr, Port, TLSOpts1, Timeout),
   normalise(Resp).
 
-connect_opts(Host, {verify, verify_none}, _MaybeCaCerts) ->
+connect_opts({verify, verify_none}, _MaybeCaCerts, _SNI) ->
   [
     binary,
     {packet, raw},
     {active, false},
-    {verify, verify_none},
-    {server_name_indication, Host}
+    {verify, verify_none}
   ];
 
-connect_opts(Host, {verify, verify_peer}, CaCerts) ->
+connect_opts({verify, verify_peer}, CaCerts, SNI) ->
   Certs = case CaCerts of
     {some, C} -> C;
     none -> public_key:cacerts_get()
   end,
 
-  [
+  Base = [
     binary,
     {packet, raw},
     {active, false},
     {verify, verify_peer},
-    {cacerts, Certs},
-    {server_name_indication, Host},
-    {customize_hostname_check, [
-      {match_fun, public_key:pkix_verify_hostname_match_fun(https)}
-    ]
-  }].
+    {cacerts, Certs}
+  ],
+
+  case SNI of
+    {server_name_indication, disable} -> Base;
+    {server_name_indication, _Host} ->
+      [{customize_hostname_check, [
+          {match_fun, public_key:pkix_verify_hostname_match_fun(https)}
+      ]} | Base]
+  end.
+
+address_with_sni({hostname, Hostname}) ->
+  Host = unicode:characters_to_list(Hostname),
+  {Host, {server_name_indication, Host}};
+
+address_with_sni({ip_address, {ipv4_address, A, B, C, D}}) ->
+  {{A, B, C, D}, {server_name_indication, disable}};
+
+address_with_sni({ip_address, {ipv6_address, A, B, C, D, E, F, G, H}}) ->
+  {{A, B, C, D, E, F, G, H}, {server_name_indication, disable}}.
 
 active(SslSocket) ->
   case ssl:setopts(SslSocket, [{active, true}]) of
