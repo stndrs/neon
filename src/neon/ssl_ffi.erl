@@ -88,10 +88,7 @@ passive(SslSocket) ->
 
 controlling_process(SslSocket, Pid) ->
   Res = ssl:controlling_process(SslSocket, Pid),
-  case normalise(Res) of
-    {error, badarg} -> {error, closed};
-    Other -> Other
-  end.
+  normalise(Res).
 
 shutdown(SslSocket) ->
   Shut = ssl:shutdown(SslSocket, read_write),

@@ -460,6 +460,16 @@ pub fn controlling_process_close_test() {
   assert ssl.controlling_process(client, process.self()) == Error(ssl.Closed)
 }
 
+pub fn controlling_process_invalid_pid_test() {
+  let #(client, _server) = connected_pair()
+
+  // Spawn a process that immediately exits
+  let pid = process.spawn(fn() { Nil })
+  process.sleep(10)
+
+  assert ssl.controlling_process(client, pid) == Ok(Nil)
+}
+
 // ---------- port ---------- //
 
 pub fn port_test() {
