@@ -1,4 +1,28 @@
+import gleam/option.{None, Some}
 import neon/net
+
+// ---------- address constructors ---------- //
+
+pub fn hostname_test() {
+  let addr = net.hostname("example.com")
+  assert None == net.address_to_ip_version(addr)
+}
+
+pub fn ip_address_from_ipv4_test() {
+  let assert Ok(ip) = net.ipv4_address(10, 0, 0, 1)
+  let addr = net.ip_address(ip)
+
+  assert Some(net.Ipv4) == net.address_to_ip_version(addr)
+}
+
+pub fn ip_address_from_ipv6_test() {
+  let assert Ok(ip) = net.ipv6_address(0xfe80, 0, 0, 0, 0, 0, 0, 1)
+  let addr = net.ip_address(ip)
+
+  assert Some(net.Ipv6) == net.address_to_ip_version(addr)
+}
+
+// ---------- parse_ip_address ---------- //
 
 pub fn parse_ipv4_loopback_test() {
   let assert Ok(expected) = net.ipv4_address(127, 0, 0, 1)
@@ -171,6 +195,18 @@ pub fn port_zero_test() {
   let assert 0 = net.port_to_int(port)
 }
 
+// ---------- port ---------- //
+
+pub fn port_mid_range_test() {
+  let assert Ok(port) = net.port(8080)
+  assert 8080 == net.port_to_int(port)
+}
+
+pub fn port_one_test() {
+  let assert Ok(port) = net.port(1)
+  assert 1 == net.port_to_int(port)
+}
+
 // ---------- timeout validation ---------- //
 
 pub fn timeout_negative_test() {
@@ -179,6 +215,10 @@ pub fn timeout_negative_test() {
 
 pub fn timeout_zero_test() {
   let assert Ok(_) = net.timeout(0)
+}
+
+pub fn timeout_positive_test() {
+  let assert Ok(_) = net.timeout(5000)
 }
 
 // ---------- ipv4_address validation ---------- //
@@ -224,17 +264,65 @@ pub fn ipv6_address_middle_group_negative_test() {
 // ---------- posix_to_string ---------- //
 
 pub fn posix_to_string_econnrefused_test() {
-  let assert "econnrefused" = net.posix_to_string(net.Econnrefused)
+  assert "econnrefused" == net.posix_to_string(net.Econnrefused)
 }
 
 pub fn posix_to_string_eaddrinuse_test() {
-  let assert "eaddrinuse" = net.posix_to_string(net.Eaddrinuse)
+  assert "eaddrinuse" == net.posix_to_string(net.Eaddrinuse)
 }
 
 pub fn posix_to_string_eacces_test() {
-  let assert "eacces" = net.posix_to_string(net.Eacces)
+  assert "eacces" == net.posix_to_string(net.Eacces)
 }
 
 pub fn posix_to_string_nxdomain_test() {
-  let assert "nxdomain" = net.posix_to_string(net.Nxdomain)
+  assert "nxdomain" == net.posix_to_string(net.Nxdomain)
+}
+
+pub fn posix_to_string_eaddrnotavail_test() {
+  assert "eaddrnotavail" == net.posix_to_string(net.Eaddrnotavail)
+}
+
+pub fn posix_to_string_eafnosupport_test() {
+  assert "eafnosupport" == net.posix_to_string(net.Eafnosupport)
+}
+
+pub fn posix_to_string_econnaborted_test() {
+  assert "econnaborted" == net.posix_to_string(net.Econnaborted)
+}
+
+pub fn posix_to_string_econnreset_test() {
+  assert "econnreset" == net.posix_to_string(net.Econnreset)
+}
+
+pub fn posix_to_string_ehostunreach_test() {
+  assert "ehostunreach" == net.posix_to_string(net.Ehostunreach)
+}
+
+pub fn posix_to_string_enetunreach_test() {
+  assert "enetunreach" == net.posix_to_string(net.Enetunreach)
+}
+
+pub fn posix_to_string_etimedout_test() {
+  assert "etimedout" == net.posix_to_string(net.Etimedout)
+}
+
+pub fn posix_to_string_einval_test() {
+  assert "einval" == net.posix_to_string(net.Einval)
+}
+
+pub fn posix_to_string_eperm_test() {
+  assert "eperm" == net.posix_to_string(net.Eperm)
+}
+
+pub fn posix_to_string_enoent_test() {
+  assert "enoent" == net.posix_to_string(net.Enoent)
+}
+
+pub fn posix_to_string_enobufs_test() {
+  assert "enobufs" == net.posix_to_string(net.Enobufs)
+}
+
+pub fn posix_to_string_eshutdown_test() {
+  assert "eshutdown" == net.posix_to_string(net.Eshutdown)
 }
