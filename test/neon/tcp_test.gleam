@@ -70,8 +70,8 @@ pub fn connect_error_test() {
     net.parse_ip_address(host)
     |> result.map(net.ip_address)
 
-  let assert Error(tcp.Posix(net.Econnrefused)) =
-    address
+  assert Error(tcp.Posix(net.Econnrefused))
+    == address
     |> tcp.new(port)
     |> tcp.ip_version(net.Ipv4)
     |> tcp.connect
@@ -84,7 +84,7 @@ pub fn listen_error_test() {
 
   // Port 1 is privileged so listening should fail
   let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
-  let assert Error(tcp.Posix(net.Eacces)) = tcp.listen(port, loopback)
+  assert Error(tcp.Posix(net.Eacces)) == tcp.listen(port, loopback)
 }
 
 // ---------- accept ---------- //
@@ -96,7 +96,7 @@ pub fn accept_timeout_test() {
 
   // No client connects, so accept should time out
   let assert Ok(timeout) = net.timeout(50)
-  let assert Error(tcp.Timeout) = tcp.accept(listener, timeout)
+  assert Error(tcp.Timeout) == tcp.accept(listener, timeout)
 }
 
 // ---------- send ---------- //
@@ -104,15 +104,15 @@ pub fn accept_timeout_test() {
 pub fn send_test() {
   let #(socket, _listener) = connected_pair()
 
-  let assert Ok(Nil) = tcp.send(socket, <<"hello":utf8>>)
-  let assert Ok(Nil) = tcp.shutdown(socket)
+  assert Ok(Nil) == tcp.send(socket, <<"hello":utf8>>)
+  assert Ok(Nil) == tcp.shutdown(socket)
 }
 
 pub fn send_closed_test() {
   let #(socket, _listener) = connected_pair()
 
   let assert Ok(_) = tcp.shutdown(socket)
-  let assert Error(tcp.Closed) = tcp.send(socket, <<"hello":utf8>>)
+  assert Error(tcp.Closed) == tcp.send(socket, <<"hello":utf8>>)
 }
 
 // ---------- receive ---------- //
@@ -136,7 +136,7 @@ pub fn receive_timeout_test() {
 
   // No data is sent, so receive should time out
   let assert Ok(timeout) = net.timeout(100)
-  let assert Error(tcp.Timeout) = tcp.receive(socket, 1, timeout)
+  assert Error(tcp.Timeout) == tcp.receive(socket, 1, timeout)
 
   let assert Ok(_) = tcp.shutdown(socket)
 }
@@ -151,7 +151,7 @@ pub fn receive_closed_test() {
   process.sleep(50)
 
   let assert Ok(timeout) = net.timeout(1000)
-  let assert Error(tcp.Closed) = tcp.receive(socket, 1, timeout)
+  assert Error(tcp.Closed) == tcp.receive(socket, 1, timeout)
 }
 
 pub fn receive_forever_test() {
@@ -185,15 +185,15 @@ pub fn receive_forever_closed_test() {
       tcp.close(server_sock)
     })
 
-  let assert Error(tcp.Closed) = tcp.receive(socket, 1, net.infinity)
+  assert Error(tcp.Closed) == tcp.receive(socket, 1, net.infinity)
 }
 
 pub fn receive_negative_length_test() {
   let #(socket, _listener) = connected_pair()
 
   let assert Ok(timeout) = net.timeout(1000)
-  let assert Error(tcp.TcpError("Length must be non-negative")) =
-    tcp.receive(socket, -1, timeout)
+  assert Error(tcp.TcpError("Length must be non-negative"))
+    == tcp.receive(socket, -1, timeout)
 }
 
 // ---------- close ---------- //
@@ -213,7 +213,7 @@ pub fn close_test() {
 pub fn shutdown_test() {
   let #(socket, _listener) = connected_pair()
 
-  let assert Ok(Nil) = tcp.shutdown(socket)
+  assert Ok(Nil) == tcp.shutdown(socket)
 }
 
 pub fn shutdown_closed_test() {
@@ -223,7 +223,7 @@ pub fn shutdown_closed_test() {
   assert Nil == tcp.close(socket)
   assert Nil == tcp.close(listener)
 
-  let assert Error(tcp.Closed) = tcp.shutdown(socket)
+  assert Error(tcp.Closed) == tcp.shutdown(socket)
 }
 
 // ---------- active ---------- //
@@ -238,7 +238,7 @@ pub fn active_test() {
   let assert Ok(_) = tcp.active(client)
 
   // Server sends data
-  let assert Ok(Nil) = tcp.send(server, <<"hello active":utf8>>)
+  assert Ok(Nil) == tcp.send(server, <<"hello active":utf8>>)
 
   // Client receives data as a TcpMessage via selector
   let selector =
@@ -281,7 +281,7 @@ pub fn passive_test() {
   let assert Ok(_) = tcp.passive(client)
 
   // Server sends data
-  let assert Ok(Nil) = tcp.send(server, <<"passive data":utf8>>)
+  assert Ok(Nil) == tcp.send(server, <<"passive data":utf8>>)
 
   // Give data time to arrive at the socket
   process.sleep(50)
@@ -291,7 +291,7 @@ pub fn passive_test() {
     process.new_selector()
     |> tcp.select(fn(msg) { msg })
 
-  let assert Error(Nil) = process.selector_receive(from: selector, within: 100)
+  assert Error(Nil) == process.selector_receive(from: selector, within: 100)
 
   // But synchronous receive should work
   let assert Ok(timeout) = net.timeout(1000)
@@ -308,7 +308,7 @@ pub fn active_then_passive_test() {
   let assert Ok(client) = tcp.active(client)
 
   // Server sends first message
-  let assert Ok(Nil) = tcp.send(server, <<"first":utf8>>)
+  assert Ok(Nil) == tcp.send(server, <<"first":utf8>>)
 
   // Client receives first message via selector
   let selector =
@@ -322,7 +322,7 @@ pub fn active_then_passive_test() {
   let assert Ok(_) = tcp.passive(client)
 
   // Server sends second message
-  let assert Ok(Nil) = tcp.send(server, <<"second":utf8>>)
+  assert Ok(Nil) == tcp.send(server, <<"second":utf8>>)
 
   // Give data time to arrive
   process.sleep(50)
@@ -394,8 +394,8 @@ pub fn connect_timeout_test() {
   let assert Ok(port) = net.port(9999)
   let assert Ok(short_timeout) = net.timeout(50)
 
-  let assert Error(tcp.Timeout) =
-    address
+  assert Error(tcp.Timeout)
+    == address
     |> tcp.new(port)
     |> tcp.timeout(short_timeout)
     |> tcp.connect

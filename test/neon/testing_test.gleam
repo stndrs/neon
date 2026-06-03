@@ -69,7 +69,7 @@ fn assert_handshake(data: testing.PkixTestData, payload: BitArray) {
       let assert Ok(timeout) = net.timeout(5000)
       let assert Ok(transport) = ssl.accept(listener, timeout)
       let assert Ok(server_ssl) = ssl.handshake(transport, hs_opts)
-      let assert Ok(Nil) = ssl.send(server_ssl, payload)
+      assert Ok(Nil) == ssl.send(server_ssl, payload)
       process.send(test_subject, Nil)
     })
 

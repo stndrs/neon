@@ -176,8 +176,8 @@ pub fn upgrade_error_test() {
 
   let host = net.hostname(host)
 
-  let assert Error(ssl.Closed) =
-    ssl.from_tcp(socket, host)
+  assert Error(ssl.Closed)
+    == ssl.from_tcp(socket, host)
     |> ssl.verify_none
     |> ssl.connect
 
@@ -339,8 +339,8 @@ pub fn connect_timeout_test() {
 
   let host = net.hostname(host)
 
-  let assert Error(ssl.Timeout) =
-    ssl.new(host, port_num)
+  assert Error(ssl.Timeout)
+    == ssl.new(host, port_num)
     |> ssl.verify_none
     |> ssl.timeout(short_timeout)
     |> ssl.connect
@@ -353,8 +353,8 @@ pub fn connect_error_test() {
 
   let host = net.hostname(host)
 
-  let assert Error(ssl.Posix(net.Econnrefused)) =
-    ssl.new(host, port)
+  assert Error(ssl.Posix(net.Econnrefused))
+    == ssl.new(host, port)
     |> ssl.connect
 }
 
@@ -398,8 +398,8 @@ pub fn connect_tls_alert_unknown_ca_test() {
 pub fn send_test() {
   let #(ssl_socket, _server_ssl) = connected_pair()
 
-  let assert Ok(Nil) = ssl.send(ssl_socket, <<"hello ssl":utf8>>)
-  let assert Ok(Nil) = ssl.shutdown(ssl_socket)
+  assert Ok(Nil) == ssl.send(ssl_socket, <<"hello ssl":utf8>>)
+  assert Ok(Nil) == ssl.shutdown(ssl_socket)
 }
 
 pub fn send_closed_test() {
@@ -407,7 +407,7 @@ pub fn send_closed_test() {
 
   let assert Ok(_) = ssl.shutdown(ssl_socket)
   process.sleep(50)
-  let assert Error(ssl.Closed) = ssl.send(ssl_socket, <<"hello":utf8>>)
+  assert Error(ssl.Closed) == ssl.send(ssl_socket, <<"hello":utf8>>)
 }
 
 // ---------- receive ---------- //
@@ -427,7 +427,7 @@ pub fn receive_timeout_test() {
 
   // No data is sent, so receive should time out
   let assert Ok(timeout) = net.timeout(100)
-  let assert Error(ssl.Timeout) = ssl.receive(ssl_socket, 1, timeout)
+  assert Error(ssl.Timeout) == ssl.receive(ssl_socket, 1, timeout)
 
   let _ = ssl.close(server_ssl)
 }
@@ -451,19 +451,19 @@ pub fn receive_negative_length_test() {
   let #(ssl_socket, _server_ssl) = connected_pair()
 
   let assert Ok(timeout) = net.timeout(1000)
-  let assert Error(ssl.SslError("Length must be non-negative")) =
-    ssl.receive(ssl_socket, -1, timeout)
+  assert Error(ssl.SslError("Length must be non-negative"))
+    == ssl.receive(ssl_socket, -1, timeout)
 }
 
 pub fn receive_closed_test() {
   let #(ssl_socket, server_ssl) = connected_pair()
 
-  let assert Ok(Nil) = ssl.close(server_ssl)
+  assert Ok(Nil) == ssl.close(server_ssl)
 
   process.sleep(50)
 
   let assert Ok(timeout) = net.timeout(1000)
-  let assert Error(ssl.Closed) = ssl.receive(ssl_socket, 1, timeout)
+  assert Error(ssl.Closed) == ssl.receive(ssl_socket, 1, timeout)
 }
 
 pub fn receive_forever_closed_test() {
@@ -472,11 +472,11 @@ pub fn receive_forever_closed_test() {
 
   let _pid =
     process.spawn(fn() {
-      let assert Ok(Nil) = ssl.close(server_ssl)
+      assert Ok(Nil) == ssl.close(server_ssl)
       process.send(test_subject, Nil)
     })
 
-  let assert Error(ssl.Closed) = ssl.receive(ssl_socket, 1, net.infinity)
+  assert Error(ssl.Closed) == ssl.receive(ssl_socket, 1, net.infinity)
 
   let assert Ok(_) = process.receive(test_subject, 1000)
 }
@@ -486,11 +486,11 @@ pub fn receive_forever_closed_test() {
 pub fn close_test() {
   let #(ssl_socket, server_ssl) = connected_pair()
 
-  let assert Ok(Nil) = ssl.close(ssl_socket)
-  let assert Ok(Nil) = ssl.close(ssl_socket)
+  assert Ok(Nil) == ssl.close(ssl_socket)
+  assert Ok(Nil) == ssl.close(ssl_socket)
 
-  let assert Ok(Nil) = ssl.close(server_ssl)
-  let assert Ok(Nil) = ssl.close(server_ssl)
+  assert Ok(Nil) == ssl.close(server_ssl)
+  assert Ok(Nil) == ssl.close(server_ssl)
 }
 
 // ---------- shutdown ---------- //
@@ -498,17 +498,17 @@ pub fn close_test() {
 pub fn shutdown_test() {
   let #(ssl_socket, _server_ssl) = connected_pair()
 
-  let assert Ok(Nil) = ssl.shutdown(ssl_socket)
+  assert Ok(Nil) == ssl.shutdown(ssl_socket)
 }
 
 pub fn shutdown_closed_test() {
   let #(ssl_socket, server_ssl) = connected_pair()
 
-  let assert Ok(Nil) = ssl.close(server_ssl)
+  assert Ok(Nil) == ssl.close(server_ssl)
 
   process.sleep(50)
 
-  let assert Error(ssl.Closed) = ssl.shutdown(ssl_socket)
+  assert Error(ssl.Closed) == ssl.shutdown(ssl_socket)
 }
 
 // ---------- active ---------- //
@@ -520,7 +520,7 @@ pub fn active_test() {
   let assert Ok(_) = ssl.active(client)
 
   // Server sends data
-  let assert Ok(Nil) = ssl.send(server, <<"hello active":utf8>>)
+  assert Ok(Nil) == ssl.send(server, <<"hello active":utf8>>)
 
   // Client receives data as an SslMessage via selector
   let selector =
@@ -538,7 +538,7 @@ pub fn active_closed_test() {
   let assert Ok(_) = ssl.active(client)
 
   // Server closes its side
-  let assert Ok(Nil) = ssl.close(server)
+  assert Ok(Nil) == ssl.close(server)
 
   // Client receives SocketClosed message
   let selector =
@@ -557,7 +557,7 @@ pub fn passive_test() {
   let assert Ok(_) = ssl.passive(client)
 
   // Server sends data
-  let assert Ok(Nil) = ssl.send(server, <<"passive data":utf8>>)
+  assert Ok(Nil) == ssl.send(server, <<"passive data":utf8>>)
 
   // Give data time to arrive at the socket
   process.sleep(50)
@@ -567,7 +567,7 @@ pub fn passive_test() {
     process.new_selector()
     |> ssl.select(fn(msg) { msg })
 
-  let assert Error(Nil) = process.selector_receive(from: selector, within: 100)
+  assert Error(Nil) == process.selector_receive(from: selector, within: 100)
 
   // But synchronous receive should work
   let assert Ok(timeout) = net.timeout(1000)
@@ -581,7 +581,7 @@ pub fn active_then_passive_test() {
   let assert Ok(client) = ssl.active(client)
 
   // Server sends first message
-  let assert Ok(Nil) = ssl.send(server, <<"first":utf8>>)
+  assert Ok(Nil) == ssl.send(server, <<"first":utf8>>)
 
   // Client receives first message via selector
   let selector =
@@ -595,7 +595,7 @@ pub fn active_then_passive_test() {
   let assert Ok(_) = ssl.passive(client)
 
   // Server sends second message
-  let assert Ok(Nil) = ssl.send(server, <<"second":utf8>>)
+  assert Ok(Nil) == ssl.send(server, <<"second":utf8>>)
 
   // Give data time to arrive
   process.sleep(50)
@@ -661,7 +661,7 @@ pub fn port_test() {
 pub fn port_closed_test() {
   let #(ssl_socket, _server_ssl) = connected_pair()
 
-  let assert Ok(Nil) = ssl.close(ssl_socket)
+  assert Ok(Nil) == ssl.close(ssl_socket)
 
   let assert Error(ssl.Posix(_posix)) = ssl.port(ssl_socket)
 }
@@ -686,7 +686,7 @@ pub fn accept_timeout_test() {
   let assert Ok(listener) = ssl.listen(port, loopback)
 
   let assert Ok(timeout) = net.timeout(100)
-  let assert Error(ssl.Timeout) = ssl.accept(listener, timeout)
+  assert Error(ssl.Timeout) == ssl.accept(listener, timeout)
 }
 
 pub fn accept_non_listener_test() {
@@ -724,7 +724,7 @@ pub fn handshake_timeout_test() {
 
   let assert Ok(timeout) = net.timeout(5000)
   let assert Ok(transport) = ssl.accept(listener, timeout)
-  let assert Error(ssl.Timeout) = ssl.handshake(transport, hs_opts)
+  assert Error(ssl.Timeout) == ssl.handshake(transport, hs_opts)
 }
 
 // ---------- server: handshake send/receive ---------- //
@@ -751,7 +751,7 @@ pub fn handshake_send_receive_test() {
       let assert Ok(server_ssl) = ssl.handshake(transport, hs_opts)
 
       // Server sends data to client
-      let assert Ok(Nil) = ssl.send(server_ssl, <<"from server":utf8>>)
+      assert Ok(Nil) == ssl.send(server_ssl, <<"from server":utf8>>)
 
       // Server receives data from client
       let assert Ok(<<"from client":utf8>>) =
@@ -772,7 +772,7 @@ pub fn handshake_send_receive_test() {
   let assert Ok(<<"from server":utf8>>) = ssl.receive(client_ssl, 11, timeout)
 
   // Client sends data to server
-  let assert Ok(Nil) = ssl.send(client_ssl, <<"from client":utf8>>)
+  assert Ok(Nil) == ssl.send(client_ssl, <<"from client":utf8>>)
 
   let assert Ok(_) = process.receive(test_subject, 5000)
 }
@@ -802,7 +802,7 @@ pub fn handshake_tcp_send_receive_test() {
       let assert Ok(server_ssl) = ssl.handshake_from_tcp(accepted, hs_opts)
 
       // Server sends data to client
-      let assert Ok(Nil) = ssl.send(server_ssl, <<"starttls server":utf8>>)
+      assert Ok(Nil) == ssl.send(server_ssl, <<"starttls server":utf8>>)
 
       // Server receives data from client
       let assert Ok(<<"starttls client":utf8>>) =
@@ -834,7 +834,7 @@ pub fn handshake_tcp_send_receive_test() {
     ssl.receive(client_ssl, 15, timeout)
 
   // Client sends data to server
-  let assert Ok(Nil) = ssl.send(client_ssl, <<"starttls client":utf8>>)
+  assert Ok(Nil) == ssl.send(client_ssl, <<"starttls client":utf8>>)
 
   let assert Ok(_) = process.receive(test_subject, 5000)
 }
@@ -855,14 +855,14 @@ pub fn connect_ssl_not_started_test() {
 
   let host = net.hostname(host)
 
-  let assert Error(ssl.SslNotStarted) =
-    ssl.new(host, port_num)
+  assert Error(ssl.SslNotStarted)
+    == ssl.new(host, port_num)
     |> ssl.verify_none
     |> ssl.connect
 
   tcp.close(tcp_listener)
 
-  let assert Ok(Nil) = ssl.start()
+  assert Ok(Nil) == ssl.start()
 }
 
 fn connected_pair() -> #(Ssl, Ssl) {
