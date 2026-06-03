@@ -332,6 +332,43 @@ pub fn active_then_passive_test() {
   let assert Ok(<<"second":utf8>>) = tcp.receive(client, 0, timeout)
 }
 
+pub fn controlling_process_test() {
+  let #(client, listener) = connected_pair()
+
+  let assert Ok(timeout) = net.timeout(1000)
+  let assert Ok(server) = tcp.accept(listener, timeout)
+
+  // Switch to active mode
+  let assert Ok(client) = tcp.active(client)
+
+  // Create a process for receiving a message
+  let pid =
+    process.spawn(fn() {
+      let selector =
+        process.new_selector()
+        |> tcp.select(fn(msg) { msg })
+
+      assert process.selector_receive_forever(from: selector)
+        == tcp.Packet(client, <<"foo!":utf8>>)
+    })
+
+  assert tcp.controlling_process(client, pid) == Ok(Nil)
+
+  assert Ok(Nil) == tcp.send(server, <<"foo!":utf8>>)
+}
+
+pub fn controlling_process_close_test() {
+  let #(client, listener) = connected_pair()
+
+  let assert Ok(timeout) = net.timeout(1000)
+  let assert Ok(_) = tcp.accept(listener, timeout)
+
+  // Closes the socket on server side
+  tcp.close(client)
+
+  assert tcp.controlling_process(client, process.self()) == Error(tcp.Closed)
+}
+
 // Creates a TCP listener on an OS-assigned port, connects a client socket
 // to it, and returns the client socket along with the listener port
 fn connected_pair() -> #(Tcp, Tcp) {

@@ -10,7 +10,8 @@
   connect/4,
   send/2,
   recv/3,
-  shutdown/1
+  shutdown/1,
+  controlling_process/2
 ]).
 
 connect(Address, Port, IpVersion, {timeout, Int}) ->
@@ -48,6 +49,16 @@ passive(TcpSocket) ->
   case inet:setopts(TcpSocket, [{active, false}]) of
     ok -> {ok, TcpSocket};
     Error -> normalise(Error)
+  end.
+
+controlling_process(TcpSocket, Pid) ->
+  Res = gen_tcp:controlling_process(TcpSocket, Pid),
+  case normalise(Res) of
+    %% Pid will always be valid thanks to Gleam type safety.
+    %% We just need to handle a case where TcpSocket is closed and
+    %% the function returns `{error, badarg}` instead of `{error, closed}`.
+    {error, badarg} -> {error, closed};
+    Other -> Other
   end.
 
 shutdown(TcpSocket) ->
@@ -100,6 +111,8 @@ normalise({ok, TcpSocket}) -> {ok, TcpSocket};
 normalise({error, closed} = E) -> E;
 normalise({error, timeout} = E) -> E;
 normalise({error, system_limit} = E) -> E;
+normalise({error, not_owner}) -> {error, not_owner};
+normalise({error, badarg}) -> {error, badarg};
 normalise({error, {timeout, _}}) -> {error, timeout};
 normalise({error, Posix}) -> {error, {posix, Posix}}.
 

@@ -16,6 +16,8 @@ pub type TcpError {
   Timeout
   /// The Erlang VM can't allocate more resources for network operations.
   SystemLimit
+  /// The calling process is not the current owner of the socket.
+  NotOwner
   /// A POSIX error.
   Posix(net.Posix)
   /// A generic TCP error with a description.
@@ -110,6 +112,16 @@ pub fn passive(socket: Tcp) -> Result(Tcp, TcpError) {
   tcp_passive_(socket)
 }
 
+/// Change the controlling process (owner) of a socket.
+///
+/// The controlling process is the process that the socket sends messages to.
+pub fn controlling_process(
+  socket: Tcp,
+  pid: process.Pid,
+) -> Result(Nil, TcpError) {
+  tcp_controlling_process_(socket, pid)
+}
+
 /// Adds TCP message handlers to a selector for use with active mode sockets.
 ///
 /// In active mode, incoming data, close notifications, and errors are
@@ -200,6 +212,12 @@ fn tcp_accept_(listener: Tcp, timeout: net.Timeout) -> Result(Tcp, TcpError)
 
 @external(erlang, "tcp_ffi", "close")
 fn tcp_close_(socket: Tcp) -> Nil
+
+@external(erlang, "tcp_ffi", "controlling_process")
+fn tcp_controlling_process_(
+  socket: Tcp,
+  pid: process.Pid,
+) -> Result(Nil, TcpError)
 
 @external(erlang, "inet_ffi", "port")
 fn inet_port_(socket: Tcp) -> Result(Int, Nil)

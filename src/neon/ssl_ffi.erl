@@ -15,7 +15,8 @@
   handshake/5,
   active/1,
   passive/1,
-  handle_ssl_message/1
+  handle_ssl_message/1,
+  controlling_process/2
 ]).
 
 start() ->
@@ -83,6 +84,13 @@ passive(SslSocket) ->
   case ssl:setopts(SslSocket, [{active, false}]) of
     ok -> {ok, SslSocket};
     Error -> normalise(Error)
+  end.
+
+controlling_process(SslSocket, Pid) ->
+  Res = ssl:controlling_process(SslSocket, Pid),
+  case normalise(Res) of
+    {error, badarg} -> {error, closed};
+    Other -> Other
   end.
 
 shutdown(SslSocket) ->
@@ -158,6 +166,8 @@ normalise({error, {tls_alert, {Alert, Description}}}) ->
   Desc = unicode:characters_to_binary(Description),
   {error, {tls_alert, Alert, Desc}};
 normalise({error, ssl_not_started}) -> {error, ssl_not_started};
+normalise({error, not_owner}) -> {error, not_owner};
+normalise({error, badarg}) -> {error, badarg};
 normalise({error, Reason}) when is_atom(Reason) ->
   {error, {posix, Reason}};
 normalise({error, Reason}) ->

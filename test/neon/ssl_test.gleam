@@ -429,6 +429,37 @@ pub fn active_then_passive_test() {
   let assert Ok(<<"second":utf8>>) = ssl.receive(client, 0, timeout)
 }
 
+pub fn controlling_process_test() {
+  let #(client, server) = connected_pair()
+
+  // Switch to active mode
+  let assert Ok(client) = ssl.active(client)
+
+  // Create a process for receiving a message
+  let pid =
+    process.spawn(fn() {
+      let selector =
+        process.new_selector()
+        |> ssl.select(fn(msg) { msg })
+
+      assert process.selector_receive_forever(from: selector)
+        == ssl.Packet(client, <<"foo!":utf8>>)
+    })
+
+  assert ssl.controlling_process(client, pid) == Ok(Nil)
+
+  assert Ok(Nil) == ssl.send(server, <<"foo!":utf8>>)
+}
+
+pub fn controlling_process_close_test() {
+  let #(client, _server) = connected_pair()
+
+  // Closes the socket on server side
+  assert ssl.close(client) == Ok(Nil)
+
+  assert ssl.controlling_process(client, process.self()) == Error(ssl.Closed)
+}
+
 // ---------- port ---------- //
 
 pub fn port_test() {

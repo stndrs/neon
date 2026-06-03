@@ -68,6 +68,8 @@ pub type SslError {
   Closed
   /// The operation timed out.
   Timeout
+  /// The specified PID is not socket's owner.
+  NotOwner
   /// A POSIX error.
   Posix(net.Posix)
   /// A TLS alert.
@@ -228,6 +230,16 @@ pub fn active(socket: Ssl) -> Result(Ssl, SslError) {
 /// In passive mode, data must be read explicitly using `receive`.
 pub fn passive(socket: Ssl) -> Result(Ssl, SslError) {
   ssl_passive_(socket)
+}
+
+/// Change the controlling process (owner) of a socket.
+///
+/// The controlling process is the process that the socket sends messages to.
+pub fn controlling_process(
+  socket: Ssl,
+  pid: process.Pid,
+) -> Result(Nil, SslError) {
+  ssl_controlling_process_(socket, pid)
 }
 
 /// Adds SSL message handlers to a selector for use with active mode sockets.
@@ -429,3 +441,9 @@ fn ssl_handshake_tcp_(
   cacerts: Option(List(BitArray)),
   timeout: net.Timeout,
 ) -> Result(Ssl, SslError)
+
+@external(erlang, "ssl_ffi", "controlling_process")
+fn ssl_controlling_process_(
+  socket: Ssl,
+  pid: process.Pid,
+) -> Result(Nil, SslError)
