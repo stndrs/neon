@@ -15,6 +15,10 @@
   handshake now sets `verify_peer` with `fail_if_no_peer_cert` when CA
   certificates are provided.
 
+### Changed
+
+- Updated `gleam_stdlib` to v1.0.0
+
 ## v2.0.0
 
 ### Breaking
