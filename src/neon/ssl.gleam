@@ -277,7 +277,7 @@ pub fn passive(socket: Ssl) -> Result(Ssl, SslError) {
 /// Change the controlling process of a socket.
 ///
 /// The controlling process is the process that the socket sends messages to.
-/// Note that if the provided `Pid` is invalid, this function will no-op and return `Ok(Nil)`.
+/// Returns `Error(InvalidPid)` if the provided `Pid` is not alive.
 pub fn controlling_process(
   socket: Ssl,
   pid: process.Pid,
