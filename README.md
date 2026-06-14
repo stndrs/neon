@@ -47,7 +47,7 @@ pub fn main() {
   // Connect to a TLS server with certificate verification
   let assert Ok(port) = net.port(443)
   let assert Ok(socket) =
-    ssl.new("gleam.run", port)
+    ssl.new(net.hostname("gleam.run"), port)
     |> ssl.connect
 
   let assert Ok(Nil) =

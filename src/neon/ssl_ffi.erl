@@ -4,8 +4,8 @@
   start/0,
   stop/0,
   port/1,
-  connect/5,
-  upgrade/5,
+  connect/6,
+  upgrade/6,
   send/2,
   recv/3,
   shutdown/1,
@@ -31,39 +31,40 @@ port(SslSocket) ->
   Resp = ssl:sockname(SslSocket),
   normalise(Resp).
 
-upgrade(TCPSocket, Address, Verify, MaybeCaCerts, {timeout, Int}) ->
-  upgrade(TCPSocket, Address, Verify, MaybeCaCerts, Int);
+upgrade(TCPSocket, Address, Verify, MaybeCaCerts, MaybeIdentity, {timeout, Int}) ->
+  upgrade(TCPSocket, Address, Verify, MaybeCaCerts, MaybeIdentity, Int);
 
-upgrade(TCPSocket, Address, Verify, MaybeCaCerts, Timeout) ->
+upgrade(TCPSocket, Address, Verify, MaybeCaCerts, MaybeIdentity, Timeout) ->
   {_Addr, SNI} = address_with_sni(Address),
 
-  TLSOpts = connect_opts(Verify, MaybeCaCerts, SNI),
+  TLSOpts = connect_opts(Verify, MaybeCaCerts, MaybeIdentity, SNI),
   TLSOpts1 = [SNI | TLSOpts],
 
   Resp = ssl:connect(TCPSocket, TLSOpts1, Timeout),
   normalise(Resp).
 
-connect(Address, Port, Verify, MaybeCaCerts, {timeout, Int}) ->
-  connect(Address, Port, Verify, MaybeCaCerts, Int);
+connect(Address, Port, Verify, MaybeCaCerts, MaybeIdentity, {timeout, Int}) ->
+  connect(Address, Port, Verify, MaybeCaCerts, MaybeIdentity, Int);
 
-connect(Address, {port, Port}, Verify, MaybeCaCerts, Timeout) ->
+connect(Address, {port, Port}, Verify, MaybeCaCerts, MaybeIdentity, Timeout) ->
   {Addr, SNI} = address_with_sni(Address),
 
-  TLSOpts = connect_opts(Verify, MaybeCaCerts, SNI),
+  TLSOpts = connect_opts(Verify, MaybeCaCerts, MaybeIdentity, SNI),
   TLSOpts1 = [SNI | TLSOpts],
 
   Resp = ssl:connect(Addr, Port, TLSOpts1, Timeout),
   normalise(Resp).
 
-connect_opts({verify, verify_none}, _MaybeCaCerts, _SNI) ->
-  [
+connect_opts({verify, verify_none}, _MaybeCaCerts, MaybeIdentity, _SNI) ->
+  Base = [
     binary,
     {packet, raw},
     {active, false},
     {verify, verify_none}
-  ];
+  ],
+  maybe_client_identity(MaybeIdentity, Base);
 
-connect_opts({verify, verify_peer}, CaCerts, SNI) ->
+connect_opts({verify, verify_peer}, CaCerts, MaybeIdentity, SNI) ->
   Certs = case CaCerts of
     {some, C} -> C;
     none -> public_key:cacerts_get()
@@ -77,13 +78,18 @@ connect_opts({verify, verify_peer}, CaCerts, SNI) ->
     {cacerts, Certs}
   ],
 
-  case SNI of
+  Base1 = case SNI of
     {server_name_indication, disable} -> Base;
     {server_name_indication, _Host} ->
       [{customize_hostname_check, [
           {match_fun, public_key:pkix_verify_hostname_match_fun(https)}
       ]} | Base]
-  end.
+  end,
+  maybe_client_identity(MaybeIdentity, Base1).
+
+maybe_client_identity(none, Opts) -> Opts;
+maybe_client_identity({some, {Cert, Key}}, Opts) ->
+  [{cert, Cert}, {key, private_key_to_erl(Key)} | Opts].
 
 address_with_sni({hostname, Hostname}) ->
   Host = unicode:characters_to_list(Hostname),
@@ -167,13 +173,18 @@ handshake(Socket, Cert, Key, MaybeCaCerts, Timeout) ->
 
   BaseOpts = [
     {cert, Cert},
-    {key, ErlKey},
-    {verify, verify_none}
+    {key, ErlKey}
   ],
 
   Opts = case MaybeCaCerts of
-    none -> BaseOpts;
-    {some, CaCerts} -> [{cacerts, CaCerts} | BaseOpts]
+    none -> [{verify, verify_none} | BaseOpts];
+    {some, CaCerts} ->
+      [
+        {verify, verify_peer},
+        {fail_if_no_peer_cert, true},
+        {cacerts, CaCerts}
+        | BaseOpts
+      ]
   end,
 
   Resp = ssl:handshake(Socket, Opts, Timeout),

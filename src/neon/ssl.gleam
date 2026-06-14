@@ -2,6 +2,7 @@ import gleam/dynamic
 import gleam/erlang/atom
 import gleam/erlang/process.{type Selector}
 import gleam/option.{type Option, None, Some}
+import gleam/result
 import neon/net
 import neon/tcp.{type Tcp}
 
@@ -59,6 +60,7 @@ pub type TlsAlert {
   BadCertificateHashValue
   UnknownPskIdentity
   NoApplicationProtocol
+  CertificateRequired
 }
 
 /// Errors that can occur during SSL/TLS operations.
@@ -111,6 +113,7 @@ pub opaque type ConnectOptions {
     connect: Connect,
     verify: Verify,
     cacerts: Option(List(BitArray)),
+    client_identity: Option(#(BitArray, PrivateKey)),
     timeout: net.Timeout,
   )
 }
@@ -126,6 +129,7 @@ pub fn new(address: net.Address, port: net.Port) -> ConnectOptions {
     connect:,
     verify: Verify(VerifyPeer),
     cacerts: None,
+    client_identity: None,
     timeout: net.infinity,
   )
 }
@@ -143,6 +147,7 @@ pub fn from_tcp(socket: Tcp, address: net.Address) -> ConnectOptions {
     connect:,
     verify: Verify(VerifyPeer),
     cacerts: None,
+    client_identity: None,
     timeout: net.infinity,
   )
 }
@@ -173,6 +178,19 @@ pub fn connect_cacerts(
   ConnectOptions(..opts, cacerts: Some(certs))
 }
 
+/// Sets the client certificate and private key for mTLS connections.
+///
+/// When the server requires client certificate verification, the provided
+/// certificate and key are used to authenticate the client during the
+/// TLS handshake.
+pub fn connect_cert(
+  opts: ConnectOptions,
+  cert cert: BitArray,
+  key key: PrivateKey,
+) -> ConnectOptions {
+  ConnectOptions(..opts, client_identity: Some(#(cert, key)))
+}
+
 /// Sets the connection timeout.
 pub fn timeout(opts: ConnectOptions, timeout: net.Timeout) -> ConnectOptions {
   ConnectOptions(..opts, timeout:)
@@ -185,13 +203,39 @@ pub fn timeout(opts: ConnectOptions, timeout: net.Timeout) -> ConnectOptions {
 ///
 /// `start` must be called before this function.
 pub fn connect(opts: ConnectOptions) -> Result(Ssl, SslError) {
+  use _ <- result.try(validate_client_identity(opts.client_identity))
+
   case opts.connect {
     Open(address:, port:) ->
       address
-      |> ssl_connect_(port, opts.verify, opts.cacerts, opts.timeout)
+      |> ssl_connect_(
+        port,
+        opts.verify,
+        opts.cacerts,
+        opts.client_identity,
+        opts.timeout,
+      )
     Upgrade(socket:, address:) -> {
-      ssl_upgrade_(socket, address, opts.verify, opts.cacerts, opts.timeout)
+      ssl_upgrade_(
+        socket,
+        address,
+        opts.verify,
+        opts.cacerts,
+        opts.client_identity,
+        opts.timeout,
+      )
     }
+  }
+}
+
+fn validate_client_identity(
+  client_identity: Option(#(BitArray, PrivateKey)),
+) -> Result(Nil, SslError) {
+  case client_identity {
+    Some(#(<<>>, _)) -> Error(SslError("empty certificate"))
+    Some(#(_, RsaPrivateKey(<<>>))) -> Error(SslError("empty private key"))
+    Some(#(_, EcPrivateKey(<<>>))) -> Error(SslError("empty private key"))
+    _ -> Ok(Nil)
   }
 }
 
@@ -233,7 +277,7 @@ pub fn passive(socket: Ssl) -> Result(Ssl, SslError) {
 /// Change the controlling process of a socket.
 ///
 /// The controlling process is the process that the socket sends messages to.
-/// Note that if the provided `Pid` is invalid, this function will no-op and return `Ok(Nil)`.
+/// Returns `Error(InvalidPid)` if the provided `Pid` is not alive.
 pub fn controlling_process(
   socket: Ssl,
   pid: process.Pid,
@@ -308,11 +352,20 @@ pub opaque type HandshakeOptions {
 ///
 /// The certificate should be a DER-encoded binary. Defaults to no CA
 /// certificates and an infinite timeout.
-pub fn handshake_options(cert: BitArray, key: PrivateKey) -> HandshakeOptions {
+pub fn handshake_options(
+  cert cert: BitArray,
+  key key: PrivateKey,
+) -> HandshakeOptions {
   HandshakeOptions(cert:, key:, cacerts: None, timeout: net.infinity)
 }
 
 /// Sets the CA certificates for client certificate verification.
+///
+/// When set, the server will request and verify the client's certificate
+/// during the TLS handshake (`verify_peer` with `fail_if_no_peer_cert`).
+/// A client that does not present a valid certificate will be rejected.
+/// When not set, no client certificate verification is performed
+/// (`verify_none`).
 pub fn handshake_cacerts(
   opts: HandshakeOptions,
   certs: List(BitArray),
@@ -371,6 +424,7 @@ fn ssl_upgrade_(
   address: net.Address,
   verify: Verify,
   cacerts: Option(List(BitArray)),
+  client_identity: Option(#(BitArray, PrivateKey)),
   timeout: net.Timeout,
 ) -> Result(Ssl, SslError)
 
@@ -389,6 +443,7 @@ fn ssl_connect_(
   port: net.Port,
   verify: Verify,
   cacerts: Option(List(BitArray)),
+  client_identity: Option(#(BitArray, PrivateKey)),
   timeout: net.Timeout,
 ) -> Result(Ssl, SslError)
 
