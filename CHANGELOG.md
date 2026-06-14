@@ -11,7 +11,7 @@
 
 - `connect_cert` function for mTLS client-certificate authentication during
   SSL/TLS connections.
-- Server-side client-certificate verification via `handshake_cacerts` — the
+- Server-side client-certificate verification via `handshake_cacerts`. The
   handshake now sets `verify_peer` with `fail_if_no_peer_cert` when CA
   certificates are provided.
 
