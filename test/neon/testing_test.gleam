@@ -82,9 +82,7 @@ fn assert_handshake(data: testing.PkixTestData, payload: BitArray) {
   let assert Ok(listener) = ssl.listen(port, loopback)
   let assert Ok(listener_port) = ssl.port(listener)
 
-  let hs_opts =
-    ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
+  let hs_opts = ssl.handshake_options(data.server.cert, data.server.key)
 
   let test_subject = process.new_subject()
 

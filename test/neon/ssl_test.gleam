@@ -247,7 +247,6 @@ pub fn connect_tls_alert_unknown_ca_test() {
 
   let hs_opts =
     ssl.handshake_options(server_data.server.cert, server_data.server.key)
-    |> ssl.handshake_cacerts(server_data.server.cacerts)
 
   let _pid =
     process.spawn(fn() {
@@ -294,7 +293,6 @@ pub fn connect_wrong_cacerts_test() {
 
   let hs_opts =
     ssl.handshake_options(server_data.server.cert, server_data.server.key)
-    |> ssl.handshake_cacerts(server_data.server.cacerts)
 
   let _pid =
     process.spawn(fn() {
@@ -639,7 +637,6 @@ pub fn handshake_timeout_test() {
 
   let hs_opts =
     ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
     |> ssl.handshake_timeout({
       let assert Ok(t) = net.timeout(50)
       t
@@ -670,7 +667,6 @@ pub fn handshake_with_finite_timeout_test() {
 
   let hs_opts =
     ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
     |> ssl.handshake_timeout({
       let assert Ok(t) = net.timeout(5000)
       t
@@ -707,9 +703,7 @@ pub fn handshake_send_receive_test() {
   let assert Ok(listener) = ssl.listen(port, loopback)
   let assert Ok(listener_port) = ssl.port(listener)
 
-  let hs_opts =
-    ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
+  let hs_opts = ssl.handshake_options(data.server.cert, data.server.key)
 
   let test_subject = process.new_subject()
 
@@ -755,9 +749,7 @@ pub fn handshake_ec_key_test() {
   let assert Ok(listener) = ssl.listen(port, loopback)
   let assert Ok(listener_port) = ssl.port(listener)
 
-  let hs_opts =
-    ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
+  let hs_opts = ssl.handshake_options(data.server.cert, data.server.key)
 
   let test_subject = process.new_subject()
 
@@ -797,9 +789,7 @@ pub fn handshake_tcp_send_receive_test() {
   use ip_address <- with_ipv4_address()
   use tcp_listener <- with_tcp_listener(ip_address)
 
-  let hs_opts =
-    ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
+  let hs_opts = ssl.handshake_options(data.server.cert, data.server.key)
 
   let test_subject = process.new_subject()
 
@@ -877,6 +867,166 @@ pub fn listen_error_test() {
   let assert Error(ssl.Posix(net.Eacces)) = ssl.listen(port, loopback)
 }
 
+// ---------- server: mTLS (handshake_cacerts) ---------- //
+
+pub fn handshake_cacerts_rejects_no_client_cert_test() {
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(listener_port) = ssl.port(listener)
+
+  // Server requires client cert verification
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.client.cacerts)
+
+  let test_subject = process.new_subject()
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(transport) = ssl.accept(listener, timeout)
+      use <- with_suppressed_logging()
+
+      // Server handshake should fail: client presents no certificate
+      let assert Error(ssl.TlsAlert(ssl.CertificateRequired, _)) =
+        ssl.handshake(transport, hs_opts)
+
+      process.send(test_subject, Nil)
+    })
+
+  // Client connects without presenting a client certificate
+  let host = net.hostname(host)
+
+  let assert Ok(_client_ssl) =
+    ssl.new(host, listener_port)
+    |> ssl.verify_none
+    |> ssl.connect
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
+pub fn handshake_cacerts_rejects_invalid_client_cert_test() {
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+  let wrong_data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(listener_port) = ssl.port(listener)
+
+  // Server requires client cert verification, trusts the CA that signed data's client cert
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.client.cacerts)
+
+  let test_subject = process.new_subject()
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(transport) = ssl.accept(listener, timeout)
+      use <- with_suppressed_logging()
+
+      // Server handshake should fail: client cert is signed by an untrusted CA
+      let assert Error(ssl.TlsAlert(ssl.UnknownCa, _)) =
+        ssl.handshake(transport, hs_opts)
+
+      process.send(test_subject, Nil)
+    })
+
+  // Client connects with a certificate signed by a different CA
+  let host = net.hostname(host)
+
+  let assert Ok(_client_ssl) =
+    ssl.new(host, listener_port)
+    |> ssl.verify_none
+    |> ssl.connect_cert(wrong_data.client.cert, key: wrong_data.client.key)
+    |> ssl.connect
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
+pub fn handshake_cacerts_accepts_client_cert_test() {
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(listener_port) = ssl.port(listener)
+
+  // Server requires client cert verification, trusts the CA that signed the client cert
+  let hs_opts =
+    ssl.handshake_options(data.server.cert, data.server.key)
+    |> ssl.handshake_cacerts(data.client.cacerts)
+
+  let test_subject = process.new_subject()
+
+  let _pid =
+    process.spawn(fn() {
+      let assert Ok(timeout) = net.timeout(5000)
+      let assert Ok(transport) = ssl.accept(listener, timeout)
+      let assert Ok(server_ssl) = ssl.handshake(transport, hs_opts)
+
+      // Server receives data from client
+      let assert Ok(<<"mtls hello":utf8>>) =
+        ssl.receive(server_ssl, 10, timeout)
+
+      process.send(test_subject, Nil)
+    })
+
+  // Client connects WITH a certificate via the public API
+  let host = net.hostname(host)
+
+  let assert Ok(client_ssl) =
+    ssl.new(host, listener_port)
+    |> ssl.verify_none
+    |> ssl.connect_cert(data.client.cert, key: data.client.key)
+    |> ssl.connect
+
+  let assert Ok(Nil) = ssl.send(client_ssl, <<"mtls hello":utf8>>)
+
+  let assert Ok(_) = process.receive(test_subject, 5000)
+}
+
+pub fn connect_cert_empty_cert_test() {
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(listener_port) = ssl.port(listener)
+
+  let host = net.hostname(host)
+
+  // Client with an empty certificate should get a validation error
+  let assert Error(ssl.SslError("empty certificate")) =
+    ssl.new(host, listener_port)
+    |> ssl.verify_none
+    |> ssl.connect_cert(<<>>, key: ssl.rsa_private_key(<<>>))
+    |> ssl.connect
+}
+
+pub fn connect_cert_empty_key_test() {
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(0)
+  let assert Ok(listener) = ssl.listen(port, loopback)
+  let assert Ok(listener_port) = ssl.port(listener)
+
+  let data = testing.pkix_test_data(testing.rsa(2048), host)
+  let host = net.hostname(host)
+
+  // Client with an empty private key should get a validation error
+  let assert Error(ssl.SslError("empty private key")) =
+    ssl.new(host, listener_port)
+    |> ssl.verify_none
+    |> ssl.connect_cert(data.client.cert, key: ssl.rsa_private_key(<<>>))
+    |> ssl.connect
+}
+
 type TcpListener {
   TcpListener(address: net.Address, port: net.Port, socket: tcp.Tcp)
 }
@@ -936,9 +1086,7 @@ fn with_ssl_server_upgrade(
 ) -> t {
   let data = testing.pkix_test_data(testing.rsa(2048), host)
 
-  let hs_opts =
-    ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
+  let hs_opts = ssl.handshake_options(data.server.cert, data.server.key)
 
   let _pid =
     process.spawn(fn() {
@@ -960,9 +1108,7 @@ fn with_ssl_server(
 ) -> t {
   let data = testing.pkix_test_data(testing.rsa(2048), host)
 
-  let hs_opts =
-    ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
+  let hs_opts = ssl.handshake_options(data.server.cert, data.server.key)
 
   let _pid =
     process.spawn(fn() {
@@ -994,9 +1140,7 @@ fn connected_pairs() -> #(Ssl, Ssl) {
 
   let data = testing.pkix_test_data(testing.rsa(2048), host)
 
-  let hs_opts =
-    ssl.handshake_options(data.server.cert, data.server.key)
-    |> ssl.handshake_cacerts(data.server.cacerts)
+  let hs_opts = ssl.handshake_options(data.server.cert, data.server.key)
 
   let _pid =
     process.spawn(fn() {
