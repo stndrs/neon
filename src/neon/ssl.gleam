@@ -77,6 +77,8 @@ pub type SslError {
   SslError(String)
   /// The SSL application has not been started. Call `start` first.
   SslNotStarted
+  /// The calling process is not the current owner of the socket.
+  NotOwner
   /// The target pid is not alive.
   InvalidPid
 }
