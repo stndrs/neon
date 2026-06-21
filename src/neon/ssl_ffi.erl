@@ -204,7 +204,6 @@ normalise({error, {tls_alert, {Alert, Description}}}) ->
   {error, {tls_alert, Alert, Desc}};
 normalise({error, ssl_not_started}) -> {error, ssl_not_started};
 normalise({error, not_owner}) -> {error, not_owner};
-normalise({error, badarg}) -> {error, badarg};
 normalise({error, Reason}) when is_atom(Reason) ->
   {error, {posix, Reason}};
 normalise({error, Reason}) ->

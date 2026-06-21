@@ -77,6 +77,8 @@ pub type SslError {
   SslError(String)
   /// The SSL application has not been started. Call `start` first.
   SslNotStarted
+  /// The calling process is not the current owner of the socket.
+  NotOwner
   /// The target pid is not alive.
   InvalidPid
 }
@@ -290,7 +292,10 @@ pub fn controlling_process(
 /// In active mode, incoming data, close notifications, and errors are
 /// delivered as messages to the socket owner's mailbox. Use this function
 /// to register handlers for these messages on a `Selector`.
-pub fn select(selector: Selector(t), mapper: fn(SslMessage) -> t) -> Selector(t) {
+pub fn select(
+  selector: Selector(t),
+  mapper: fn(SslMessage) -> t,
+) -> Selector(t) {
   let map = fn(msg) { mapper(handle_ssl_message_(msg)) }
   selector
   |> process.select_record(tag: atom.create("ssl"), fields: 2, mapping: map)

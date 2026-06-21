@@ -575,6 +575,20 @@ pub fn controlling_process_invalid_pid_test() {
   assert ssl.controlling_process(client, pid) == Error(ssl.InvalidPid)
 }
 
+pub fn controlling_process_not_owner_test() {
+  use ip_address <- with_ipv4_address()
+  use ssl_listener <- with_ssl_listener(ip_address)
+
+  // Transfer ownership of the listen socket to another (alive) process
+  let other = process.spawn(fn() { process.sleep(1000) })
+  assert ssl.controlling_process(ssl_listener.socket, other) == Ok(Nil)
+
+  // This process is no longer the owner, so a further transfer attempt
+  // must surface as a matchable NotOwner error (not an unmatchable atom).
+  assert ssl.controlling_process(ssl_listener.socket, process.self())
+    == Error(ssl.NotOwner)
+}
+
 // ---------- port ---------- //
 
 pub fn port_test() {
@@ -1055,7 +1069,10 @@ fn with_ipv6_address(next: fn(net.IpAddress) -> t) -> t {
   next(loopback)
 }
 
-fn with_tcp_listener(ip_address: net.IpAddress, next: fn(TcpListener) -> t) -> t {
+fn with_tcp_listener(
+  ip_address: net.IpAddress,
+  next: fn(TcpListener) -> t,
+) -> t {
   // Set up a TCP listener, connect a client, then upgrade both sides to SSL
   let assert Ok(port) = net.port(0)
   let assert Ok(tcp_listener) = tcp.listen(port, ip_address)
@@ -1067,7 +1084,10 @@ fn with_tcp_listener(ip_address: net.IpAddress, next: fn(TcpListener) -> t) -> t
   |> next
 }
 
-fn with_ssl_listener(ip_address: net.IpAddress, next: fn(SslListener) -> t) -> t {
+fn with_ssl_listener(
+  ip_address: net.IpAddress,
+  next: fn(SslListener) -> t,
+) -> t {
   // Set up a TCP listener, connect a client, then upgrade both sides to SSL
   let assert Ok(port) = net.port(0)
   let assert Ok(ssl_listener) = ssl.listen(port, ip_address)

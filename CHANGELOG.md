@@ -1,11 +1,14 @@
 # Changelog
 
-## Unreleased
+## v3.0.0
 
 ### Breaking
 
 - Added `CertificateRequired` variant to `TlsAlert` type (may break exhaustive
   pattern matches).
+- Added `NotOwner` variant to the SSL `SslError` type (may break exhaustive
+  pattern matches).
+- Raised the minimum `gleam_stdlib` requirement to v1.0.0 (was v0.44.0).
 
 ### Added
 
@@ -15,9 +18,11 @@
   handshake now sets `verify_peer` with `fail_if_no_peer_cert` when CA
   certificates are provided.
 
-### Changed
+### Fixed
 
-- Updated `gleam_stdlib` to v1.0.0
+- SSL `controlling_process` could return an Erlang `not_owner` atom that did not
+  correspond to any `SslError` variant, causing a runtime crash for callers
+  pattern matching on the error. It now returns the new `NotOwner` variant.
 
 ## v2.0.0
 
