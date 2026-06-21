@@ -129,7 +129,10 @@ pub fn controlling_process(
 /// In active mode, incoming data, close notifications, and errors are
 /// delivered as messages to the socket owner's mailbox. Use this function
 /// to register handlers for these messages on a `Selector`.
-pub fn select(selector: Selector(t), mapper: fn(TcpMessage) -> t) -> Selector(t) {
+pub fn select(
+  selector: Selector(t),
+  mapper: fn(TcpMessage) -> t,
+) -> Selector(t) {
   let mapping = fn(msg) { mapper(handle_tcp_message_(msg)) }
 
   selector

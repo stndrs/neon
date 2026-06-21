@@ -1069,7 +1069,10 @@ fn with_ipv6_address(next: fn(net.IpAddress) -> t) -> t {
   next(loopback)
 }
 
-fn with_tcp_listener(ip_address: net.IpAddress, next: fn(TcpListener) -> t) -> t {
+fn with_tcp_listener(
+  ip_address: net.IpAddress,
+  next: fn(TcpListener) -> t,
+) -> t {
   // Set up a TCP listener, connect a client, then upgrade both sides to SSL
   let assert Ok(port) = net.port(0)
   let assert Ok(tcp_listener) = tcp.listen(port, ip_address)
@@ -1081,7 +1084,10 @@ fn with_tcp_listener(ip_address: net.IpAddress, next: fn(TcpListener) -> t) -> t
   |> next
 }
 
-fn with_ssl_listener(ip_address: net.IpAddress, next: fn(SslListener) -> t) -> t {
+fn with_ssl_listener(
+  ip_address: net.IpAddress,
+  next: fn(SslListener) -> t,
+) -> t {
   // Set up a TCP listener, connect a client, then upgrade both sides to SSL
   let assert Ok(port) = net.port(0)
   let assert Ok(ssl_listener) = ssl.listen(port, ip_address)
