@@ -8,6 +8,7 @@
   pattern matches).
 - Added `NotOwner` variant to the SSL `SslError` type (may break exhaustive
   pattern matches).
+- Raised the minimum `gleam_stdlib` requirement to v1.0.0 (was v0.44.0).
 
 ### Added
 
@@ -22,10 +23,6 @@
 - SSL `controlling_process` could return an Erlang `not_owner` atom that did not
   correspond to any `SslError` variant, causing a runtime crash for callers
   pattern matching on the error. It now returns the new `NotOwner` variant.
-
-### Changed
-
-- Updated `gleam_stdlib` to v1.0.0
 
 ## v2.0.0
 
