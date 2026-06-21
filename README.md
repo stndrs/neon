@@ -58,6 +58,68 @@ pub fn main() {
 }
 ```
 
+### Mutual TLS (mTLS)
+
+In mutual TLS the client authenticates itself with a certificate and the server
+verifies it against a trusted CA. Certificates and private keys are DER-encoded
+binaries.
+
+On the **client**, present a certificate with `connect_cert`:
+
+```gleam
+import neon/net
+import neon/ssl
+
+pub fn main() {
+  let assert Ok(Nil) = ssl.start()
+
+  // DER-encoded client certificate and private key (e.g. loaded from disk)
+  let client_cert: BitArray = todo
+  let client_key = ssl.rsa_private_key(todo)
+
+  let assert Ok(port) = net.port(8443)
+  let assert Ok(socket) =
+    ssl.new(net.hostname("example.com"), port)
+    |> ssl.connect_cert(client_cert, key: client_key)
+    |> ssl.connect
+
+  let assert Ok(Nil) = ssl.send(socket, <<"hello":utf8>>)
+}
+```
+
+On the **server**, require and verify client certificates with
+`handshake_cacerts`. This enables `verify_peer` with `fail_if_no_peer_cert`, so
+a client that does not present a valid, CA-signed certificate is rejected during
+the handshake:
+
+```gleam
+import neon/net
+import neon/ssl
+
+pub fn main() {
+  let assert Ok(Nil) = ssl.start()
+
+  // DER-encoded server certificate/key, plus the CA certificate(s) to trust
+  let server_cert: BitArray = todo
+  let server_key = ssl.rsa_private_key(todo)
+  let trusted_cacerts: List(BitArray) = todo
+
+  let assert Ok(loopback) = net.ipv4_address(127, 0, 0, 1)
+  let assert Ok(port) = net.port(8443)
+  let assert Ok(listener) = ssl.listen(port, loopback)
+
+  let assert Ok(timeout) = net.timeout(5000)
+  let assert Ok(transport) = ssl.accept(listener, timeout)
+
+  let opts =
+    ssl.handshake_options(server_cert, key: server_key)
+    |> ssl.handshake_cacerts(trusted_cacerts)
+  let assert Ok(socket) = ssl.handshake(transport, opts)
+
+  let assert Ok(msg) = ssl.receive(socket, 0, timeout)
+}
+```
+
 ### UDP
 
 ```gleam
