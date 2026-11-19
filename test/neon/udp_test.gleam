@@ -63,6 +63,17 @@ pub fn send_test() {
   assert Ok(Nil) == udp.send(sock, <<"hello":utf8>>)
 }
 
+pub fn send_to_test() {
+  let assert Ok(port) = net.port(0)
+  let assert Ok(sock) = udp.new(port) |> udp.open
+  let assert Ok(port_num) = udp.port(sock)
+  let assert Ok(address) =
+    net.parse_ip_address(host)
+    |> result.map(net.ip_address)
+
+  assert Ok(Nil) == udp.send_to(sock, address, port_num, <<"hello":utf8>>)
+}
+
 pub fn send_closed_test() {
   let assert Ok(port) = net.port(0)
   let assert Ok(sock) = udp.new(port) |> udp.open

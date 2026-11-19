@@ -78,6 +78,27 @@ pub fn send(socket: Udp, payload: BitArray) -> Result(Nil, UdpError) {
   udp_send_(socket, payload)
 }
 
+/// Sends data to a *specified destination*.
+/// You may use this when you don't want to connect to a remote address + port and reuse the socket for other incomming connections.
+/// ## Example
+/// ```gleam
+/// // ...
+/// let socket: Udp = todo
+/// let payload: BitArray = todo
+/// let recieve_data: ReceiveData = todo
+/// let assert Ok(address) = net.ipv4_address(recieve_data.ip_address)
+/// send_to(socket, address, recieve_data.port, payload)
+/// // ...
+/// ```
+pub fn send_to(
+  socket: Udp,
+  address: net.Address,
+  port: net.Port,
+  payload: BitArray,
+) -> Result(Nil, UdpError) {
+  upd_send_to_(socket, address, port, payload)
+}
+
 /// Data received from a UDP socket, including the sender's IP address,
 /// port, and the payload.
 pub type ReceiveData {
@@ -146,6 +167,14 @@ fn udp_connect_(
 
 @external(erlang, "udp_ffi", "send")
 fn udp_send_(socket: Udp, payload: BitArray) -> Result(Nil, UdpError)
+
+@external(erlang, "udp_ffi", "send_to")
+fn upd_send_to_(
+  socket: Udp,
+  address: net.Address,
+  port: net.Port,
+  payload: BitArray,
+) -> Result(Nil, UdpError)
 
 @external(erlang, "udp_ffi", "recv")
 fn udp_receive_(
