@@ -74,16 +74,19 @@ normalise({error, timeout} = E) -> E;
 normalise({error, system_limit} = E) -> E;
 normalise({error, Posix}) -> {error, {posix, Posix}}.
 
+%% Erlang IpAddress -> Gleam IpAddress
 normalise_ip_address({A, B, C, D}) ->
   {ipv4_address, A, B, C, D};
 normalise_ip_address({A, B, C, D, E, F, G, H}) ->
   {ipv6_address, A, B, C, D, E, F, G, H}.
 
+%% Gleam IpAddress -> Erlang IpAddress | used in `send_to`
 denormalise_ip_address({ipv4_address, A, B, C, D}) ->
   {A, B, C, D};
 denormalise_ip_address({ipv6_address, A, B, C, D, E, F, G, H}) ->
   {A, B, C, D, E, F, G, H}.
 
+%% Gleam Address -> Erlang Address | used in `send_to` and `connect`
 hostname_or_ipaddress(Address) ->
   case Address of
     {hostname, Hostname} -> unicode:characters_to_list(Hostname);
