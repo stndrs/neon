@@ -4,6 +4,7 @@
   open/3,
   connect/3,
   send/2,
+  send_to/4,
   recv/3,
   close/1,
   controlling_process/2
@@ -22,16 +23,17 @@ open({port, Port}, MaybeIpAddress, IpVersion) ->
   end.
 
 connect(UdpSocket, Address, {port, Port}) ->
-  Addr = case Address of
-    {hostname, Hostname} -> unicode:characters_to_list(Hostname);
-    {ip_address, {ipv4_address, A, B, C, D}} -> {A, B, C, D};
-    {ip_address, {ipv6_address, A, B, C, D, E, F, G, H}} -> {A, B, C, D, E, F, G, H}
-  end,
+  Addr = hostname_or_ipaddress(Address),
   Resp = gen_udp:connect(UdpSocket, Addr, Port),
   normalise(Resp).
 
 send(UdpSocket, Packet) ->
   Resp = gen_udp:send(UdpSocket, Packet),
+  normalise(Resp).
+
+send_to(UdpSocket, Address, {port, Port}, Packet) ->
+  Addr = hostname_or_ipaddress(Address),
+  Resp = gen_udp:send(UdpSocket, Addr, Port, Packet),
   normalise(Resp).
 
 recv(UdpSocket, Length, {timeout, Int}) ->
@@ -76,6 +78,17 @@ normalise_ip_address({A, B, C, D}) ->
   {ipv4_address, A, B, C, D};
 normalise_ip_address({A, B, C, D, E, F, G, H}) ->
   {ipv6_address, A, B, C, D, E, F, G, H}.
+
+denormalise_ip_address({ipv4_address, A, B, C, D}) ->
+  {A, B, C, D};
+denormalise_ip_address({ipv6_address, A, B, C, D, E, F, G, H}) ->
+  {A, B, C, D, E, F, G, H}.
+
+hostname_or_ipaddress(Address) ->
+  case Address of
+    {hostname, Hostname} -> unicode:characters_to_list(Hostname);
+    {ip_address, IpAddr} -> denormalise_ip_address(IpAddr)
+  end.
 
 ip_address_and_version({ipv4_address, A, B, C, D}) ->
   {inet, {A, B, C, D}};
